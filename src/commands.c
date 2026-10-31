@@ -41,10 +41,10 @@ void get_input(void) {
     RUN_ORIGINAL_IF_LAG(kGetInput);  // the loop starts at the routine's start
     read_input();
     emu_set_a(data_ptr[0]);
-    // A pass takes about 1,000 cycles and the frame leaves about 9,000 after the split, so key_repeat
-    // counts 9 a frame while nothing is pressed.
+    // The original's key_repeat counts 9.7 a frame on average while a direction is held (measured on
+    // Mesen2), which gives a step every 14 frames there and here.
     if(!c->a) {
-      emu_spin(9);
+      emu_spin(97);
     }
   } while(!c->a);
   emu_set_a(c->a & 0xF0);

@@ -35,7 +35,7 @@ void title_screen(void) {
     RESUME_ORIGINAL_IF_LAG(kTitleScreen, 0x842B, 0);
     emu_set_a(joy_pressed[0] & 0xD0);
     if(!c->a) {
-      emu_spin(1);
+      emu_spin(10);
     }
   } while(!c->a);
   do {
@@ -43,7 +43,7 @@ void title_screen(void) {
     RESUME_ORIGINAL_IF_LAG(kTitleScreen, 0x8434, 0);
     emu_set_a(joy_held[0] & 0xD0);
     if(c->a) {
-      emu_spin(1);
+      emu_spin(10);
     }
   } while(c->a);
   fade_out_palette();

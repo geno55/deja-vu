@@ -765,11 +765,10 @@ the NES's 60.0988 frames a second by the clock, with the save RAM kept in a file
   port is. Such code gets a frame's worth of cycles and then the frame passes, so a loop in it can't hang
   the window, and the NMI comes where it is, as on the console. An opcode that freezes a real 6502 freezes
   the game for good: frames still pass, with no NMI, as on Mesen2. Closing the window still works.
-- **Key repeat counts passes, not frames.** In the command area `key_repeat` counts passes of
-  `get_input`'s loop while a direction is held, and the cursor moves on every 128th. So the loop has to
-  run at the original's rate: 9 passes a frame. A pass of the original takes about 1,000 cycles
-  (`read_input` is 990 in that mode), and the frame leaves about 9,000 after the split; the one frame
-  in the movies that sits in the loop throughout has 9. That makes about 14 frames a step.
+- **Key repeat counts passes, not frames.** In the command area and the inventory, `key_repeat` counts
+  passes of `get_input`'s loop while a direction is held, and the cursor moves on every 128th. So the loop
+  has to run at the original's rate. Logging `key_repeat` at every frame of a held direction on Mesen2 shows
+  9.7 a frame on average, and a step every 14 frames, which `emu_spin(97)` gives here too.
 - **Checked** (`--compare --free-run`): the C side on its own matches the reference at every NMI of
   both movies up to the first real lag NMI, at NMI 272 of #1260 and 270 of #7044 (`$CA1B`, in the save
   code), where it can't follow. NMIs in the spins aren't compared, as the reference is partway through

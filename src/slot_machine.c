@@ -471,7 +471,7 @@ void ending_wait_button(void) {
     RESUME_ORIGINAL_IF_LAG(kEndingWaitButton, 0xB2E3, 0);
     emu_set_a(joy_pressed[0]);
     if(!(c->a & 0x80)) {
-      emu_spin(1);
+      emu_spin(10);
     }
   } while(!(c->a & 0x80));
   c->y = 0x03;

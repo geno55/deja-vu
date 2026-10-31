@@ -102,9 +102,10 @@ void emu_set_frame_hook(void (*hook)(void));
 int emu_run_frame(char *err, size_t err_size);
 
 // In a loop that spins without waiting for the NMI (get_input, reading the controller): on the
-// console the NMI comes anyway. In the game on its own, a frame passes every `passes_per_frame` calls.
-// With a reference, it does nothing, as the reference says where the NMI goes.
-void emu_spin(unsigned passes_per_frame);
+// console the NMI comes anyway. In the game on its own, a frame passes every `tenths_of_passes` / 10
+// calls, counted from the last wait: 97 for 9.7 calls a frame. With a reference, it does nothing, as the
+// reference says where the NMI goes.
+void emu_spin(unsigned tenths_of_passes);
 
 // How many times a port went on as original code for an index past a table's end
 // (emu_note_bad_index), outside checks: real play shouldn't.

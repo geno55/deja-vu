@@ -376,9 +376,9 @@ static void made_up_nmi(void) {
   g_nes.pad[0] ^= 0x01;
 }
 
-void emu_spin(unsigned passes_per_frame) {
-  if(free_run && in_game() && ++spin_passes >= passes_per_frame) {
-    spin_passes = 0;
+void emu_spin(unsigned tenths_of_passes) {
+  if(free_run && in_game() && (spin_passes += 10) >= tenths_of_passes) {
+    spin_passes -= tenths_of_passes;
     guards_since_wait = 0;
     coro_yield();
   }
@@ -411,6 +411,7 @@ void emu_wait_for_nmi(uint16_t spin) {
   }
   if(free_run) {
     guards_since_wait = 0;
+    spin_passes = 0;  // a wait ends the frame: the next spin starts on a new one
     coro_yield();
     return;
   }
