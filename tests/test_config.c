@@ -50,6 +50,17 @@ int main(int argc, char **argv) {
   // The right key in another section isn't the setting.
   CHECK(read_text("[General]\nFixBugs = 0\n", 1) == 1);
 
+  // The other setting, on its own.
+  {
+    FILE *f = fopen(path, "wb");
+    CHECK(f != NULL);
+    fputs("[Features]\nFixText = 1\n", f);
+    fclose(f);
+    DvConfig other = {0};
+    CHECK(config_read(path, &other, err, sizeof(err)) == 0);
+    CHECK(other.fix_text == 1 && other.fix_bugs == 0);
+  }
+
   // No file: it says so, and the settings stay.
   remove(path);
   DvConfig c = {1};

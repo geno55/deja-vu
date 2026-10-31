@@ -106,12 +106,13 @@ you update, copy it to `dejavu.user.ini` there: the game reads that one instead.
 
 | Setting | Default | What it does |
 |---|---|---|
+| `FixText` | `0` | With `1`, corrects the original's typos, grammar, punctuation and inconsistent spellings. It doesn't affect saves. |
 | `FixBugs` | `0` | With `1`, fixes the original's save check, where a damaged save file is erased or hangs the game, and the capsule warp, which breaks the room you are in when you use the capsules on medicine you haven't taken. Speedruns use that warp. |
 
 ## How close is it to the NES?
 The game was compared frame by frame with the original running in the Mesen2 emulator, using two recorded
 speedruns. The picture matched pixel for pixel, apart from 11 frames in the run that relies on glitches.
-The colors and sound were also compared by eye and ear. The game's own bugs and quirks are kept, unless you turn on the fixes under
+The colors and sound were also compared by eye and ear. The game's own bugs, typos and quirks are kept, unless you turn on the fixes under
 [Settings](#settings).
 
 There are a few differences:

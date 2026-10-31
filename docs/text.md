@@ -66,6 +66,22 @@ Letters, spaces, punctuation and names all go through `print_tile` (`7:E1F2`). T
 text relies on that: "PALM" + "IS" with no space between them shows as two lines.
 `messages.txt` shows those automatic line breaks too.
 
+## Corrections
+`FixText = 1` in `dejavu.ini` corrects the original's spelling, grammar, punctuation and inconsistent spellings
+(`src/text_fixes.c`). It's off by default. One correction is to an item's name, not a message: OFREEAL becomes
+OFREEALL, as the medicine list has it and as earlier versions of the game spell it (Apple IIgs, on the vial and
+in the file). It takes the eighth and last place in the name. The game's own text comes from the player's ROM, so the source holds
+only the words to change. When the game starts, it decodes each changed message, applies its corrections, encodes
+it again with the game's own code table, and puts it back. If it no longer fits, it goes in unused space in the
+same bank (`free_space_2`, `unused_4`, `unused_5`) and the message tables point there. That is only in memory: the pack, the ROM and the save files
+stay as they were.
+
+The window wraps after 26 characters and the text relies on it, so a correction that changes a line's length
+also moves a line break where needed. `tests/test_text_fixes.c` checks all of this on the ROM: every correction
+applies, no other message changes, nothing outside the tables and the unused space changes, and no changed
+message shows a word that the game doesn't have and the corrections don't add, which is how a split or joined
+word would show.
+
 ## The window
 The window is in the second nametable, and the sprite-0 split shows it below the picture
 (`clear_text_window` sets `split_nametable`; a message's end clears it, unless `text_keep_open`

@@ -43,6 +43,9 @@ static int apply(DvConfig *config, const char *section, const char *key, const c
   if(same_text(section, "Features") && same_text(key, "FixBugs")) {
     return parse_bool(value, &config->fix_bugs);
   }
+  if(same_text(section, "Features") && same_text(key, "FixText")) {
+    return parse_bool(value, &config->fix_text);
+  }
   return 0;
 }
 

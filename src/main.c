@@ -33,6 +33,7 @@
 #include "platform.h"
 #include "ppu_render.h"
 #include "save_file.h"
+#include "text_fixes.h"
 
 enum {
   kSaveCheckFrames = 60,  // how often to see if the save RAM has changed
@@ -50,6 +51,7 @@ static uint32_t palette_rgb[kPpuColors];
 static uint32_t picture_rgb[kScreenWidth * kScreenHeight];
 static int16_t audio[4096];
 static GameData game_data;
+static int fix_text;     // the settings' FixText
 static int show_errors;  // playing in a window: an error that stops the game has to be seen
 
 static void draw_picture(void) {
@@ -149,6 +151,7 @@ static int load_settings(const char *path, const char *dir) {
     }
   }
   g_fix_bugs = config.fix_bugs;
+  fix_text = config.fix_text;
   return 0;
 }
 
@@ -310,6 +313,13 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  if(fix_text) {  // after the pack is written: it stays the player's own data
+    char fix_err[256];
+    if(text_fixes_apply(game_data.prg, fix_err, sizeof(fix_err)) < 0) {
+      report_error(fix_err);
+      return 1;
+    }
+  }
   if(dv_boot(game_data.prg, game_data.chr)) {
     report_error("can't start the game's coroutine");
     return 1;

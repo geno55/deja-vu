@@ -7,6 +7,7 @@
 
 typedef struct DvConfig {
   int fix_bugs;  // [Features] FixBugs
+  int fix_text;  // [Features] FixText
 } DvConfig;
 
 // Reads the file at `path` over what's in `config`. A line it can't use is reported on stderr and skipped,
