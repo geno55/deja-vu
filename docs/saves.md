@@ -55,7 +55,7 @@ saves: the game keeps a backup of the state in save RAM as you play.
 The layout is in [conventions.md](conventions.md), "Saving": three files, each 4 copies of the game's
 state with a signature and a sum, and a backup copy at `$7E00`.
 
-The 4 copies protect less than they seem to in the original game, though the port fixes that by default
+The 4 copies protect less than they seem to in the original game, which `FixBugs` in `dejavu.ini` fixes
 (below). At the title `check_save_file` goes through the copies adding up a sum that it doesn't clear from one to the
 next, so a copy after a bad one can't pass:
 
@@ -66,12 +66,11 @@ next, so a copy after a bad one can't pass:
 ### The fix
 
 The checks in "What is verified" below that erase a file are of the original's behavior, with
-`--no-fix-save-bugs`.
+`FixBugs = 0`.
 
-The game fixes this by default, and `--no-fix-save-bugs` keeps the original's behavior. This is the opposite
-of zelda3, whose bug fixes are off by default, as a player would only look for the option once a save was
-gone. It changes only how a file is checked at the title, and not the format, so the files still work on
-emulators. Only the program `dejavu` turns it on: the harness and the C tests run the original's behavior.
+`FixBugs = 1` in `dejavu.ini` fixes this. The file works as zelda3's does, with `dejavu.user.ini` in its place
+if it's there, and like zelda3's bug fixes it is off by default. It changes only how a file is checked at the title, and not the format, so the files still work on
+emulators. Only the program `dejavu` reads it: the harness and the C tests run the original's behavior.
 
 - `check_save_file` clears the sum for each copy, so a good copy passes whatever came before it.
 - A later copy passing then reaches `repair_save_copies`, which never finishes in the original
@@ -83,7 +82,7 @@ emulators. Only the program `dejavu` turns it on: the harness and the C tests ru
 With the fix on, `tests/run_save_movies.py` checks a bad copy 0, bad copies 0 and 1, and a copy 0 of all
 zeros: the game keeps the file, repairs all 4 copies and leaves the backup and the other files alone. With
 all 4 bad the file is erased, as without it, and an undamaged file plays out byte for byte the same. With
-`--no-fix-save-bugs` it runs none of this, and that is what the checks below compare with the reference. With
+`FixBugs = 0` it runs none of this, and that is what the checks below compare with the reference. With
 the fix on there is no reference to compare with, so the fixed code rests on these tests. The hang itself was never played, as it needs a state the comparison
 never reached, and it isn't tested either.
 

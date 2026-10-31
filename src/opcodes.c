@@ -1244,10 +1244,14 @@ void find_and_show_item(uint8_t item) {
 }
 
 // show_item_page_keep_cursor (7:D9E0): removes the found entry, on its page, and the page shown
-// stays or comes back.
+// stays or comes back. If find_in_goods found nothing, the original removes slot $54 anyway, past the
+// list's end, which puts $FF in room: the capsule warp (docs/rooms.md). g_fix_bugs removes nothing then.
 void show_item_page_keep_cursor(void) {
   RUN_ORIGINAL_IF_LAG(kShowItemPageKeepCursor);
   Cpu6502 *c = &g_nes.cpu;
+  if(g_fix_bugs && g_ram[0x5F] == 0x0C) {
+    return;
+  }
   saved_inventory_entry = inventory_entry;
   saved_inventory_page = inventory_page;
   inventory_entry = g_ram[0x60];

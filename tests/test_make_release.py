@@ -39,7 +39,7 @@ class Zip(unittest.TestCase):
         (root / "build/Release").mkdir(parents=True)
         (root / "tools").mkdir()
         (root / "external/SDL2-2.0").mkdir(parents=True)
-        for name in ("build/Release/dejavu.exe", "build/Release/SDL2.dll", "tools/release_readme.txt",
+        for name in ("build/Release/dejavu.exe", "build/Release/SDL2.dll", "dejavu.ini", "tools/release_readme.txt",
                      "LICENSE", "external/SDL2-2.0/LICENSE.txt", "build/Release/dejavu_assets.dat",
                      "build/Release/dejavu.sav"):
             (root / name).write_bytes(b"x")
@@ -52,7 +52,7 @@ class Zip(unittest.TestCase):
             make_release.make_zip(out, make_release.release_files(root / "build", root))
             with zipfile.ZipFile(out) as z:
                 self.assertEqual(sorted(z.namelist()), ["LICENSE-SDL2.txt", "LICENSE.txt", "README.txt",
-                                                        "SDL2.dll", "dejavu.exe"])
+                                                        "SDL2.dll", "dejavu.exe", "dejavu.ini"])
 
     def test_missing_file(self):
         with tempfile.TemporaryDirectory() as d:

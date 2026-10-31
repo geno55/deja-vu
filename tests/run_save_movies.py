@@ -7,7 +7,8 @@ The two TAS movies never save, so this is what checks saving in real play. It pl
 tests/movies/ (see tools/movie_script.py) and looks inside the save files they leave: the signature
 and sum of each copy, and the items. The port alone runs them all, and it checks that a save file of
 the wrong size is refused and left alone, and that the file a run started from is kept as .bak. It also
-checks the game's default fixes on damaged files; everything else runs with --no-fix-save-bugs.
+checks the game's save fixes on damaged files (tests/movies/fixes.ini); everything else runs with them off,
+as the reference behaves (tests/movies/original.ini).
 
 --harness adds the reference: each movie runs on Mesen2's core and the C side in lockstep, compared at
 every NMI, and Mesen2's own save file must be byte for byte what the port alone wrote. Each run after
@@ -22,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tools"))
@@ -34,7 +36,7 @@ COAT, GUN = 0x60, 0x62  # as slots hold them: $20 above COAT and GUN1's numbers 
 GOODS = 0xAE  # goods_slots in the state, which starts at $0420
 LAST_FRAMES = 300  # the frames the harness plays after a movie's last line; the port plays them too
 BACKUP = 0x1E00  # the backup of the state, at $7E00
-ORIGINAL = ("--no-fix-save-bugs",)  # as the reference behaves
+ORIGINAL = ("--config", str(MOVIES / "original.ini"))  # as the reference behaves
 TO_FILE_LIST = ".:900 T:4 .:300"  # the logos, then Start on the title: the files have been checked
 
 
@@ -201,8 +203,8 @@ def main():
     run.check((work / "first_bad_out.sav.bak").read_bytes() == damaged(saved, 0),
               "a bad first copy: what it erased is still in .bak")
 
-    # ---- With the fixes, the game's default --------------------------------------------------------
-    fix = ()
+    # ---- With the fixes on -------------------------------------------------------------------------
+    fix = ("--config", str(MOVIES / "fixes.ini"))
     with_data = bytearray(saved)  # so that the backup and the other files can be seen to be left alone
     with_data[BACKUP:BACKUP + 0x138] = bytes((i * 3 + 1) & 0xFF for i in range(0x138))
     file_2 = copy_offset(1, 0)
@@ -210,7 +212,7 @@ def main():
     with_data = bytes(with_data)
     (work / "fix_start.sav").write_bytes(damaged(with_data, 0))
     run.check(good_copies(checked_file(args, work / "fix_start.sav", work / "fix_checked.sav", ORIGINAL), 0) == 0,
-              "a bad copy 0 with --no-fix-save-bugs: the file is gone by the list of files")
+              "a bad copy 0 with the fixes off: the file is gone by the list of files")
     spoiled = {"a bad copy 0": damaged(with_data, 0), "bad copies 0 and 1": damaged(with_data, 0, 1),
                "copy 0 all zeros": zeroed(with_data, 0)}
     for what, start in spoiled.items():
@@ -232,6 +234,32 @@ def main():
     run.check(on == off, "the fixes, all 4 copies bad: the same as without them")
     on = run.port("continue_save", work / "saved.sav", work / "fix_good.sav", fix)
     run.check(on == resaved, "the fixes, an undamaged file: byte for byte the same as without them")
+
+    # Which settings file counts: a copy of the program in a folder of its own, on a bad copy 0, whose file
+    # survives only with the fixes on.
+    folder = work / "settings"
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir()
+    shutil.copy(args.dejavu if args.dejavu.exists() else str(args.dejavu) + ".exe", folder / "dejavu.exe")
+    sdl = args.dejavu.parent / "SDL2.dll"
+    if sdl.exists():
+        shutil.copy(sdl, folder)
+    alone = SimpleNamespace(dejavu=folder / "dejavu.exe", rom=args.rom)
+    (work / "fix_start.sav").write_bytes(damaged(saved, 0))
+
+    # With the fixes on, the file survives.
+    def kept():
+        return good_copies(checked_file(alone, work / "fix_start.sav", work / "fix_checked.sav", ()), 0) == 4
+
+    run.check(not kept(), "settings: with no file, the fixes are off")
+    (folder / "dejavu.ini").write_text("[Features]\nFixBugs = 1\n")
+    run.check(kept(), "settings: dejavu.ini next to the program turns them on")
+    (folder / "dejavu.user.ini").write_text("[Features]\nFixBugs = 0\n")
+    run.check(not kept(), "settings: dejavu.user.ini counts in its place")
+    shipped = (REPO / "dejavu.ini").read_text()
+    (folder / "dejavu.user.ini").unlink()
+    (folder / "dejavu.ini").write_text(shipped)
+    run.check(not kept(), "settings: the dejavu.ini everyone gets has them off")
 
     # A file that can't be this game's save RAM is refused, not overwritten.
     for size in (0, 100, SAVE_SIZE - 1, SAVE_SIZE + 1, 0x8000):

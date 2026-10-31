@@ -6,6 +6,9 @@
 dejavu_assets.dat*
 *.mss
 
+# Your own settings (dejavu.ini is the file everyone gets)
+dejavu.user.ini
+
 # Mesen2 (GPL-3.0) is fetched here for harness builds only; never commit it
 external/
 

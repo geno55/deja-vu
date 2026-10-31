@@ -13,7 +13,7 @@
 #include "funcs.h"
 #include "variables.h"
 
-int g_fix_save_bugs;
+int g_fix_bugs;
 
 // ---- Whole files ---------------------------------------------------------------------------
 
@@ -129,7 +129,7 @@ void check_all_save_files(void) {
 
 // check_save_file (7:C8C9): the first good copy goes to all 4 (repair_save_copies), and the file's
 // bit into scene_index; with none, the copies are erased. The sum isn't cleared between copies, so
-// a copy after a bad one only passes if its sum takes the bad ones' into account. g_fix_save_bugs clears
+// a copy after a bad one only passes if its sum takes the bad ones' into account. g_fix_bugs clears
 // it for each copy.
 void check_save_file(void) {
   RUN_ORIGINAL_IF_LAG(kCheckSaveFile);
@@ -138,7 +138,7 @@ void check_save_file(void) {
   emu_set_a(0x00);
   g_ram[0x64] = 0x00;
   for(;;) {
-    if(g_fix_save_bugs) {
+    if(g_fix_bugs) {
       clear_sum16();
     }
     save_copy_address();
@@ -183,7 +183,7 @@ void check_save_file(void) {
   scene_index = c->a;
 }
 
-// For g_fix_save_bugs: copy `good` of the file over the other three. Unlike what the original looks
+// For g_fix_bugs: copy `good` of the file over the other three. Unlike what the original looks
 // meant to do, this goes straight there and not through $7E00, as that would spoil the backup.
 static void copy_good_save_copy(uint8_t good) {
   uint16_t file = (uint16_t)(0x6010 + save_file * 0x800);
@@ -210,7 +210,7 @@ void repair_save_copies(void) {
   if(!c->a) {
     return;
   }
-  if(g_fix_save_bugs) {
+  if(g_fix_bugs) {
     copy_good_save_copy(c->a);
     return;
   }

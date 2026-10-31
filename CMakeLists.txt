@@ -21,7 +21,7 @@ add_library(dv_core STATIC src/cpu6502.c src/nes_hw.c src/coro.c src/dv_cpu_infr
             src/scripts.c src/flags.c src/opcodes.c src/rooms.c src/special_scenes.c
             src/saves.c src/layouts.c src/room_view.c src/room_commands.c src/inventory.c
             src/slot_machine.c src/menus.c src/sound.c src/game.c src/ppu_render.c src/apu.c
-            src/assets.c src/save_file.c)
+            src/assets.c src/save_file.c src/config.c)
 target_include_directories(dv_core PUBLIC src)
 if(NOT WIN32)
   target_link_libraries(dv_core PUBLIC m)
@@ -43,6 +43,9 @@ else()
   message(STATUS "No SDL2, so dejavu will have no window (tools/fetch_sdl2.py, or a package)")
   target_sources(dejavu PRIVATE src/platform_none.c)
 endif()
+# The settings file goes next to the program, where the game looks for it.
+add_custom_command(TARGET dejavu POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                   ${CMAKE_SOURCE_DIR}/dejavu.ini $<TARGET_FILE_DIR:dejavu>)
 add_executable(test_cpu6502 tests/test_cpu6502.c src/cpu6502.c)
 target_include_directories(test_cpu6502 PRIVATE src)
 add_executable(test_bridge tests/test_bridge.c)
@@ -57,10 +60,12 @@ add_executable(test_palette tests/test_palette.c)
 target_link_libraries(test_palette PRIVATE dv_core)
 add_executable(test_save_file tests/test_save_file.c)
 target_link_libraries(test_save_file PRIVATE dv_core)
+add_executable(test_config tests/test_config.c)
+target_link_libraries(test_config PRIVATE dv_core)
 add_executable(test_assets tests/test_assets.c)
 target_link_libraries(test_assets PRIVATE dv_core)
 foreach(target dv_core dejavu test_cpu6502 test_bridge test_sound test_game test_apu test_palette
-        test_save_file test_assets)
+        test_save_file test_config test_assets)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4)
   else()
@@ -75,6 +80,7 @@ add_test(NAME bridge COMMAND test_bridge)
 add_test(NAME apu COMMAND test_apu)
 add_test(NAME palette COMMAND test_palette)
 add_test(NAME save_file COMMAND test_save_file ${CMAKE_BINARY_DIR})
+add_test(NAME config COMMAND test_config ${CMAKE_BINARY_DIR})
 add_test(NAME variables_current
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/make_variables.py --check)
 add_test(NAME tools_unit

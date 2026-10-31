@@ -28,7 +28,11 @@ Using the capsules on medicine not yet taken makes the room `$FF`. The script's 
 (`6:AEC2`) then takes that as slot `$54`. It checks neither that the slot holds the item nor that the slot
 is on the list, so it writes the list's `$FF` end mark at `address_book + $54`, which is `room`. In that
 room the tables read out of bounds, and clicks in the picture walk through memory, reaching code in RAM and
-elsewhere. That is the original's bug, kept as it is, and TAS #7044 uses it; found by others, on TASVideos.
+elsewhere. That is the original's bug, and TAS #7044 uses it; found by others, on TASVideos.
+
+`FixBugs = 1` in `dejavu.ini` fixes it: when the search finds nothing, `show_item_page_keep_cursor` removes
+nothing, and the room stays. The rest of the script runs as it would. It's off by default, as a fixed game
+can't play a run that uses the warp.
 
 ## Item lists (`2:A400`)
 `7:D4FD` fills the coat's item slots (`$04C7`) from lists of item numbers ended by `$FF`.

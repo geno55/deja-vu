@@ -837,10 +837,10 @@ enum {
 // coroutine, for emu_run_frame, with no reference. Returns 0, or -1 if it can't.
 int dv_boot(const uint8_t *prg, const uint8_t *chr);
 
-// Fixes the two bugs in the check of the save files at the title (check_save_file, repair_save_copies;
-// docs/saves.md). Off here, as the original behaves, for the harness and the tests. The game itself
-// (main.c) turns it on unless told --no-fix-save-bugs.
-extern int g_fix_save_bugs;
+// Fixes the original's bugs: the check of the save files at the title (check_save_file,
+// repair_save_copies; docs/saves.md) and the capsule warp (show_item_page_keep_cursor; docs/rooms.md).
+// Off unless the settings' FixBugs turns it on (main.c), and always off in the harness and the tests.
+extern int g_fix_bugs;
 
 // The sound driver (sound.c).
 void sound_reset(void);

@@ -3,7 +3,7 @@
 //
 // usage: dejavu [ROM] [--scale N] [--save FILE] [--frames N] [--screenshot FILE.bmp] [--audio-wav FILE]
 //               [--no-window] [--movie FILE.inp] [--extract-assets]
-//               [--no-fix-save-bugs]
+//               [--config FILE]
 //
 // ROM        your Deja Vu (USA) dump. You only need it once: the game keeps what it needs from it in
 //            dejavu_assets.dat next to the program. Without one the game looks for that file there and
@@ -19,14 +19,15 @@
 // --no-window  run with no window and at full speed, for testing
 // --movie    play these buttons, not yours: an .inp file, one line per frame, UDLRTSBA
 // --extract-assets  make dejavu_assets.dat from the dump, and stop
-// --no-fix-save-bugs  keep the original's two bugs in checking save files at the title, where a damaged
-//            first copy erases a file (docs/saves.md). They're fixed by default
+// --config   the settings file (default: dejavu.user.ini next to the program, or else dejavu.ini there;
+//            with neither, the defaults). It says which of the original's bugs to fix (src/config.h)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "apu.h"
 #include "assets.h"
+#include "config.h"
 #include "funcs.h"
 #include "nes_hw.h"
 #include "platform.h"
@@ -130,6 +131,27 @@ static int load_game_data(const char *rom_path, const char *dir) {
   return 0;
 }
 
+// The settings, from the file named, or else dejavu.user.ini or dejavu.ini next to the program. Only a
+// file named and not there is an error: the game has its defaults. Returns 0, or -1 after saying why.
+static int load_settings(const char *path, const char *dir) {
+  DvConfig config = {.fix_bugs = 0};
+  char err[1200], name[1100];
+  if(path) {
+    if(config_read(path, &config, err, sizeof(err))) {
+      report_error(err);
+      return -1;
+    }
+  } else {
+    snprintf(name, sizeof(name), "%s%s", dir, "dejavu.user.ini");
+    if(config_read(name, &config, err, sizeof(err))) {
+      snprintf(name, sizeof(name), "%s%s", dir, "dejavu.ini");
+      config_read(name, &config, err, sizeof(err));
+    }
+  }
+  g_fix_bugs = config.fix_bugs;
+  return 0;
+}
+
 // Where the save goes unless --save says: a folder of its own next to the program, as zelda3 has it. A
 // dejavu.sav here, from before there was one, stays in use until there's a save in the folder.
 static const char *default_save_path(const char *dir) {
@@ -220,16 +242,15 @@ static void write_screenshot(const char *path) {
 
 static void usage(FILE *f) {
   fprintf(f, "usage: dejavu [ROM] [--scale N] [--save FILE] [--frames N] [--screenshot FILE.bmp] "
-             "[--audio-wav FILE] [--no-window] [--movie FILE.inp] [--extract-assets] [--no-fix-save-bugs]\n"
+             "[--audio-wav FILE] [--no-window] [--movie FILE.inp] [--extract-assets] [--config FILE]\n"
              "keys: arrows, X = A, Z = B, Enter = Start, right Shift = Select; or a game controller\n");
 }
 
 int main(int argc, char **argv) {
   const char *rom_path = NULL, *save_path = NULL, *screenshot = NULL;
-  const char *wav_path = NULL, *movie_path = NULL;
+  const char *wav_path = NULL, *movie_path = NULL, *config_path = NULL;
   long frames = -1;
   int scale = kDefaultScale, window = 1, extract_only = 0;
-  g_fix_save_bugs = 1;
   for(int i = 1; i < argc; i++) {
     const char *arg = argv[i];
     if(!strcmp(arg, "--help")) {
@@ -240,8 +261,6 @@ int main(int argc, char **argv) {
       window = 0;
     } else if(!strcmp(arg, "--extract-assets")) {
       extract_only = 1;
-    } else if(!strcmp(arg, "--no-fix-save-bugs")) {
-      g_fix_save_bugs = 0;
     } else if(arg[0] != '-') {
       rom_path = arg;
     } else if(i + 1 >= argc) {
@@ -251,6 +270,8 @@ int main(int argc, char **argv) {
       scale = atoi(argv[++i]);
     } else if(!strcmp(arg, "--save")) {
       save_path = argv[++i];
+    } else if(!strcmp(arg, "--config")) {
+      config_path = argv[++i];
     } else if(!strcmp(arg, "--frames")) {
       frames = atol(argv[++i]);
     } else if(!strcmp(arg, "--screenshot")) {
@@ -273,6 +294,9 @@ int main(int argc, char **argv) {
 
   char dir[1024];
   program_dir(argv[0], dir, sizeof(dir));
+  if(load_settings(config_path, dir)) {
+    return 1;
+  }
   if(load_game_data(rom_path, dir)) {
     return 1;
   }

@@ -51,6 +51,7 @@ def release_files(build, repo):
     files = [
         ("dejavu.exe", build / "Release" / "dejavu.exe"),
         ("SDL2.dll", build / "Release" / "SDL2.dll"),
+        ("dejavu.ini", repo / "dejavu.ini"),
         ("README.txt", repo / "tools" / "release_readme.txt"),
         ("LICENSE.txt", repo / "LICENSE"),
         ("LICENSE-SDL2.txt", sdl_licenses[-1]),
