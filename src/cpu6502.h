@@ -1,6 +1,7 @@
 // A 6502 interpreter (the NES's 2A03: no decimal mode) for running the game's original code
 // on the C side: everything in pass-through mode, and later the routines not yet ported.
-// Official opcodes only; the game uses no others.
+// The game's own code uses only official opcodes, but a glitch can run any byte as code (the capsule
+// warp, docs/rooms.md), so it has them all, from the NESdev wiki's description of the unofficial ones.
 // Cycle counts follow the standard tables, so code between two NMIs takes as many
 // cycles as on the reference, which is how the harness places the NMIs that interrupt it.
 #ifndef DV_CPU6502_H
@@ -24,8 +25,8 @@ typedef struct Cpu6502 {
 uint8_t cpu_bus_read(uint16_t addr);
 void cpu_bus_write(uint16_t addr, uint8_t value);
 
-// Runs one instruction. Returns 0, or -1 for an opcode this interpreter doesn't know (pc is
-// left on it).
+// Runs one instruction. Returns 0, or 1 for an opcode that freezes a real 6502 until a reset ($02 and
+// the others like it; pc is left on it).
 int cpu_step(Cpu6502 *c);
 
 // Takes an NMI: pushes pc and p, sets I and jumps through $FFFA. 7 cycles.

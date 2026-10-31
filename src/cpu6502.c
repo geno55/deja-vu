@@ -2,27 +2,26 @@
 // an indexed or read-modify-write access on a hardware register, where they would matter.
 #include "cpu6502.h"
 
-// Base cycles per opcode; 0 marks the unofficial opcodes, which the game doesn't use.
-// Reads with abs,X / abs,Y / (zp),Y take one more cycle when the index crosses a page, and
+// Base cycles per opcode, the unofficial ones too. Reads with abs,X / abs,Y / (zp),Y take one more cycle when the index crosses a page, and
 // branches one more when taken and another when the target is on another page.
 static const uint8_t kCycles[256] = {
   // 0 1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
-  7, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 0, 4, 6, 0,  // 0
-  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,  // 1
-  6, 6, 0, 0, 3, 3, 5, 0, 4, 2, 2, 0, 4, 4, 6, 0,  // 2
-  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,  // 3
-  6, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 3, 4, 6, 0,  // 4
-  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,  // 5
-  6, 6, 0, 0, 0, 3, 5, 0, 4, 2, 2, 0, 5, 4, 6, 0,  // 6
-  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,  // 7
-  0, 6, 0, 0, 3, 3, 3, 0, 2, 0, 2, 0, 4, 4, 4, 0,  // 8
-  2, 6, 0, 0, 4, 4, 4, 0, 2, 5, 2, 0, 0, 5, 0, 0,  // 9
-  2, 6, 2, 0, 3, 3, 3, 0, 2, 2, 2, 0, 4, 4, 4, 0,  // A
-  2, 5, 0, 0, 4, 4, 4, 0, 2, 4, 2, 0, 4, 4, 4, 0,  // B
-  2, 6, 0, 0, 3, 3, 5, 0, 2, 2, 2, 0, 4, 4, 6, 0,  // C
-  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,  // D
-  2, 6, 0, 0, 3, 3, 5, 0, 2, 2, 2, 0, 4, 4, 6, 0,  // E
-  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,  // F
+  7, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,  // 0
+  2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,  // 1
+  6, 6, 2, 8, 3, 3, 5, 5, 4, 2, 2, 2, 4, 4, 6, 6,  // 2
+  2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,  // 3
+  6, 6, 2, 8, 3, 3, 5, 5, 3, 2, 2, 2, 3, 4, 6, 6,  // 4
+  2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,  // 5
+  6, 6, 2, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6,  // 6
+  2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,  // 7
+  2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,  // 8
+  2, 6, 2, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,  // 9
+  2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,  // A
+  2, 5, 2, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,  // B
+  2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,  // C
+  2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,  // D
+  2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,  // E
+  2, 5, 2, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,  // F
 };
 
 static uint8_t fetch(Cpu6502 *c) {
@@ -160,12 +159,118 @@ static uint16_t rmw_addr(Cpu6502 *c, uint8_t op) {
   }
 }
 
+// The opcodes that read or write memory as two official instructions would, with bits 0-1 both set:
+// SLO RLA SRE RRA, SAX, LAX, DCP and ISB.
+static void unofficial_combined(Cpu6502 *c, uint8_t op) {
+  int high = (op & 0xC0) == 0x80;  // SAX and LAX, whose indexed modes use Y, not X
+  int lax = (op & 0xE0) == 0xA0;
+  uint16_t addr;
+  switch((op >> 2) & 7) {
+    case 0: addr = ind_x(c); break;
+    case 1: addr = fetch(c); break;
+    case 3: addr = fetch16(c); break;
+    case 4: addr = ind_y(c, lax); break;
+    case 5: addr = high ? zp_y(c) : zp_x(c); break;
+    case 6: addr = abs_i(c, c->y, lax); break;
+    default: addr = abs_i(c, high ? c->y : c->x, lax); break;
+  }
+  if(high) {
+    if(lax) {
+      c->a = c->x = cpu_bus_read(addr);
+      set_nz(c, c->a);
+    } else {
+      cpu_bus_write(addr, c->a & c->x);
+    }
+    return;
+  }
+  uint8_t v = cpu_bus_read(addr);
+  if(op >= 0xC0) {
+    v += op >= 0xE0 ? 1 : -1;
+    cpu_bus_write(addr, v);
+    if(op >= 0xE0) {
+      adc(c, ~v);
+    } else {
+      compare(c, c->a, v);
+    }
+    return;
+  }
+  v = shift(c, op, v);
+  cpu_bus_write(addr, v);
+  switch(op >> 5) {
+    case 0: c->a |= v; set_nz(c, c->a); break;
+    case 1: c->a &= v; set_nz(c, c->a); break;
+    case 2: c->a ^= v; set_nz(c, c->a); break;
+    default: adc(c, v); break;
+  }
+}
+
+// SHA, SHX and SHY: `v` AND the base address's high byte + 1, which on a page cross replaces the
+// high byte of the address too.
+static void unofficial_store_high(uint16_t base, uint8_t index, uint8_t v) {
+  uint16_t addr = base + index;
+  v &= (uint8_t)((base >> 8) + 1);
+  if((addr ^ base) & 0xFF00) {
+    addr = (uint16_t)(v << 8 | (addr & 0xFF));
+  }
+  cpu_bus_write(addr, v);
+}
+
+// The rest of the unofficial opcodes. Returns 1 if op is one that freezes the 6502.
+static int unofficial(Cpu6502 *c, uint8_t op) {
+  switch(op) {
+    case 0x02: case 0x12: case 0x22: case 0x32: case 0x42: case 0x52:
+    case 0x62: case 0x72: case 0x92: case 0xB2: case 0xD2: case 0xF2:
+      c->pc--;
+      return 1;
+
+    // NOPs of each size, which make their reads all the same.
+    case 0x1A: case 0x3A: case 0x5A: case 0x7A: case 0xDA: case 0xFA: break;
+    case 0x80: case 0x82: case 0x89: case 0xC2: case 0xE2: fetch(c); break;
+    case 0x04: case 0x44: case 0x64: cpu_bus_read(fetch(c)); break;
+    case 0x14: case 0x34: case 0x54: case 0x74: case 0xD4: case 0xF4: cpu_bus_read(zp_x(c)); break;
+    case 0x0C: cpu_bus_read(fetch16(c)); break;
+    case 0x1C: case 0x3C: case 0x5C: case 0x7C: case 0xDC: case 0xFC: cpu_bus_read(abs_i(c, c->x, 1)); break;
+
+    // Immediate operands. $8B and $AB are unstable on the chip: these are as Mesen2 has them.
+    case 0x0B: case 0x2B: c->a &= fetch(c); set_nz(c, c->a); set_c(c, c->a & 0x80); break;
+    case 0x4B: c->a &= fetch(c); set_c(c, c->a & 1); c->a >>= 1; set_nz(c, c->a); break;
+    case 0x6B: {
+      c->a = (c->a & fetch(c)) >> 1 | (c->p & kFlagC) << 7;
+      set_nz(c, c->a);
+      set_c(c, c->a & 0x40);
+      c->p = (c->a >> 6 ^ c->a >> 5) & 1 ? c->p | kFlagV : c->p & ~kFlagV;
+      break;
+    }
+    case 0x8B: c->a = (c->a | 0xEE) & c->x & fetch(c); set_nz(c, c->a); break;
+    case 0xAB: c->a = c->x = fetch(c); set_nz(c, c->a); break;
+    case 0xCB: {
+      uint8_t v = fetch(c), t = c->a & c->x;
+      set_c(c, t >= v);
+      c->x = t - v;
+      set_nz(c, c->x);
+      break;
+    }
+    case 0xEB: adc(c, ~fetch(c)); break;
+
+    // Stores of a value ANDed with the address, and LAS.
+    case 0x93: {
+      uint8_t z = fetch(c);
+      unofficial_store_high(read16(z, (uint8_t)(z + 1)), c->y, c->a & c->x);
+      break;
+    }
+    case 0x9B: c->s = c->a & c->x; unofficial_store_high(fetch16(c), c->y, c->s); break;
+    case 0x9C: unofficial_store_high(fetch16(c), c->x, c->y); break;
+    case 0x9E: unofficial_store_high(fetch16(c), c->y, c->x); break;
+    case 0x9F: unofficial_store_high(fetch16(c), c->y, c->a & c->x); break;
+    case 0xBB: c->a = c->x = c->s = cpu_bus_read(abs_i(c, c->y, 1)) & c->s; set_nz(c, c->a); break;
+
+    default: unofficial_combined(c, op); break;
+  }
+  return 0;
+}
+
 int cpu_step(Cpu6502 *c) {
   uint8_t op = fetch(c);
-  if(!kCycles[op]) {
-    c->pc--;
-    return -1;
-  }
   c->cycles += kCycles[op];
 
   if((op & 3) == 1) {  // ORA AND EOR ADC STA LDA CMP SBC
@@ -296,6 +401,7 @@ int cpu_step(Cpu6502 *c) {
       c->pc = read16(0xFFFE, 0xFFFF);
       break;
     }
+    default: return unofficial(c, op);
   }
   return 0;
 }

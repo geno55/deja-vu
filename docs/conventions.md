@@ -152,7 +152,8 @@ is erased, good copies and all: one wrong byte is enough. That is checked in pla
 port alike ([saves.md](saves.md)). And when a later copy does pass (copy 0 all zeros, say),
 `repair_save_copies` never ends: the `BNE` at `7:C928` goes back to the first copy loop instead of on
 through the second page, so the game hangs with NMIs still running. That one is read from the code,
-and no recording gets there. The fuzz agrees: its samples with `$64` not 0 never return.
+and no recording gets there. The fuzz agrees: its samples with `$64` not 0 never return. The game fixes both
+by default ([saves.md](saves.md), "The fix").
 
 The menus around it live in bank 2: `title_screen`, `file_select_screen` and
 `file_select_menu`, and a yes/no dialog (`open_confirm_dialog`, `confirm_dialog_loop`)

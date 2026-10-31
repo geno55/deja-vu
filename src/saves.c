@@ -13,6 +13,8 @@
 #include "funcs.h"
 #include "variables.h"
 
+int g_fix_save_bugs;
+
 // ---- Whole files ---------------------------------------------------------------------------
 
 // load_game (7:C800): the first good copy of the file, moving the bad ones out of the way; with
@@ -127,7 +129,8 @@ void check_all_save_files(void) {
 
 // check_save_file (7:C8C9): the first good copy goes to all 4 (repair_save_copies), and the file's
 // bit into scene_index; with none, the copies are erased. The sum isn't cleared between copies, so
-// a copy after a bad one only passes if its sum takes the bad ones' into account.
+// a copy after a bad one only passes if its sum takes the bad ones' into account. g_fix_save_bugs clears
+// it for each copy.
 void check_save_file(void) {
   RUN_ORIGINAL_IF_LAG(kCheckSaveFile);
   Cpu6502 *c = &g_nes.cpu;
@@ -135,6 +138,9 @@ void check_save_file(void) {
   emu_set_a(0x00);
   g_ram[0x64] = 0x00;
   for(;;) {
+    if(g_fix_save_bugs) {
+      clear_sum16();
+    }
     save_copy_address();
     RESUME_ORIGINAL_IF_LAG(kCheckSaveFile, 0xC8D3, 0);
     c->y = 0;
@@ -177,6 +183,21 @@ void check_save_file(void) {
   scene_index = c->a;
 }
 
+// For g_fix_save_bugs: copy `good` of the file over the other three. Unlike what the original looks
+// meant to do, this goes straight there and not through $7E00, as that would spoil the backup.
+static void copy_good_save_copy(uint8_t good) {
+  uint16_t file = (uint16_t)(0x6010 + save_file * 0x800);
+  uint16_t from = (uint16_t)(file + good * 0x200);
+  for(int copy = 0; copy < 4; copy++) {
+    if(copy != good) {
+      uint16_t to = (uint16_t)(file + copy * 0x200);
+      for(uint16_t i = 0; i < 0x200; i++) {
+        cpu_bus_write((uint16_t)(to + i), cpu_bus_read((uint16_t)(from + i)));
+      }
+    }
+  }
+}
+
 // repair_save_copies (7:C90F): does nothing if copy 0 is the good one. Otherwise it looks meant to
 // copy the good one to all 4 through the backup's place, but never finishes: the BNE at 7:C928 goes
 // back to the first copy loop, with Y = 1, instead of on through the second page. So it reads on
@@ -187,6 +208,10 @@ void repair_save_copies(void) {
   Cpu6502 *c = &g_nes.cpu;
   emu_set_a(g_ram[0x64]);
   if(!c->a) {
+    return;
+  }
+  if(g_fix_save_bugs) {
+    copy_good_save_copy(c->a);
     return;
   }
   save_copy_address();

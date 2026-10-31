@@ -20,6 +20,16 @@ Kind 2 has a table of sprites (`6:A88F`) but no record: just as well, as its che
 `object_sprite_condition` ends `PLA`, `TXA`, `RTS`, which would return into zero page (from the
 code; nothing gets there).
 
+A room number past the table's end reads whatever follows: see "The capsule warp" below.
+
+## The capsule warp
+Using the capsules on medicine not yet taken makes the room `$FF`. The script's search of the inventory
+(`$5F`/`$60`) runs past the last page to page 12, entry 0, without finding it, and `delete_inventory_entry`
+(`6:AEC2`) then takes that as slot `$54`. It checks neither that the slot holds the item nor that the slot
+is on the list, so it writes the list's `$FF` end mark at `address_book + $54`, which is `room`. In that
+room the tables read out of bounds, and clicks in the picture walk through memory, reaching code in RAM and
+elsewhere. That is the original's bug, kept as it is, and TAS #7044 uses it; found by others, on TASVideos.
+
 ## Item lists (`2:A400`)
 `7:D4FD` fills the coat's item slots (`$04C7`) from lists of item numbers ended by `$FF`.
 `2:A400` holds two addresses: entry 0 when `$AF` is 1, entry 1 otherwise. Each points to a

@@ -3,6 +3,7 @@
 //
 // usage: dejavu [ROM] [--scale N] [--save FILE] [--frames N] [--screenshot FILE.bmp] [--audio-wav FILE]
 //               [--no-window] [--movie FILE.inp] [--extract-assets]
+//               [--no-fix-save-bugs]
 //
 // ROM        your Deja Vu (USA) dump. You only need it once: the game keeps what it needs from it in
 //            dejavu_assets.dat next to the program. Without one the game looks for that file there and
@@ -18,6 +19,8 @@
 // --no-window  run with no window and at full speed, for testing
 // --movie    play these buttons, not yours: an .inp file, one line per frame, UDLRTSBA
 // --extract-assets  make dejavu_assets.dat from the dump, and stop
+// --no-fix-save-bugs  keep the original's two bugs in checking save files at the title, where a damaged
+//            first copy erases a file (docs/saves.md). They're fixed by default
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -217,7 +220,7 @@ static void write_screenshot(const char *path) {
 
 static void usage(FILE *f) {
   fprintf(f, "usage: dejavu [ROM] [--scale N] [--save FILE] [--frames N] [--screenshot FILE.bmp] "
-             "[--audio-wav FILE] [--no-window] [--movie FILE.inp] [--extract-assets]\n"
+             "[--audio-wav FILE] [--no-window] [--movie FILE.inp] [--extract-assets] [--no-fix-save-bugs]\n"
              "keys: arrows, X = A, Z = B, Enter = Start, right Shift = Select; or a game controller\n");
 }
 
@@ -226,6 +229,7 @@ int main(int argc, char **argv) {
   const char *wav_path = NULL, *movie_path = NULL;
   long frames = -1;
   int scale = kDefaultScale, window = 1, extract_only = 0;
+  g_fix_save_bugs = 1;
   for(int i = 1; i < argc; i++) {
     const char *arg = argv[i];
     if(!strcmp(arg, "--help")) {
@@ -236,6 +240,8 @@ int main(int argc, char **argv) {
       window = 0;
     } else if(!strcmp(arg, "--extract-assets")) {
       extract_only = 1;
+    } else if(!strcmp(arg, "--no-fix-save-bugs")) {
+      g_fix_save_bugs = 0;
     } else if(arg[0] != '-') {
       rom_path = arg;
     } else if(i + 1 >= argc) {

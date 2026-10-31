@@ -6,7 +6,8 @@ usage: run_save_movies.py --dejavu EXE [--harness EXE] [--mesen] [--rom ROM] [--
 The two TAS movies never save, so this is what checks saving in real play. It plays the scripts in
 tests/movies/ (see tools/movie_script.py) and looks inside the save files they leave: the signature
 and sum of each copy, and the items. The port alone runs them all, and it checks that a save file of
-the wrong size is refused and left alone, and that the file a run started from is kept as .bak.
+the wrong size is refused and left alone, and that the file a run started from is kept as .bak. It also
+checks the game's default fixes on damaged files; everything else runs with --no-fix-save-bugs.
 
 --harness adds the reference: each movie runs on Mesen2's core and the C side in lockstep, compared at
 every NMI, and Mesen2's own save file must be byte for byte what the port alone wrote. Each run after
@@ -32,6 +33,9 @@ STATE_SIZE = 0x110
 COAT, GUN = 0x60, 0x62  # as slots hold them: $20 above COAT and GUN1's numbers in item_names
 GOODS = 0xAE  # goods_slots in the state, which starts at $0420
 LAST_FRAMES = 300  # the frames the harness plays after a movie's last line; the port plays them too
+BACKUP = 0x1E00  # the backup of the state, at $7E00
+ORIGINAL = ("--no-fix-save-bugs",)  # as the reference behaves
+TO_FILE_LIST = ".:900 T:4 .:300"  # the logos, then Start on the title: the files have been checked
 
 
 def copy_offset(file, copy):
@@ -63,6 +67,25 @@ def erased(sav, file):
     return all(b == 0 for b in sav[copy_offset(file, 0):copy_offset(file, 0) + 0x800])
 
 
+def zeroed(sav, copy):
+    """The save file with this copy of file 1 all zeros."""
+    bad = bytearray(sav)
+    bad[copy_offset(0, copy):copy_offset(0, copy) + 0x200] = bytes(0x200)
+    return bytes(bad)
+
+
+def checked_file(args, start, out, options):
+    """The save file once the game has checked it and shows the list of files, from a copy of `start`."""
+    frames = movie_script.expand(TO_FILE_LIST)
+    movie = out.with_suffix(".inp")
+    movie.write_text("\n".join(frames) + "\n")
+    out.unlink(missing_ok=True)
+    shutil.copyfile(start, out)
+    subprocess.run([str(args.dejavu), "--no-window", str(args.rom), "--movie", str(movie), "--frames",
+                    str(len(frames)), "--save", str(out), *options], capture_output=True, text=True)
+    return out.read_bytes()
+
+
 class Run:
     def __init__(self, args, work):
         self.args = args
@@ -79,14 +102,14 @@ class Run:
         path.write_text("\n".join(frames) + "\n")
         return path, len(frames) + LAST_FRAMES
 
-    def port(self, name, start, out):
+    def port(self, name, start, out, options=ORIGINAL):
         """Plays a movie on the port alone, from a copy of `start` (None: no save file)."""
         movie, frames = self.movie(name)
         out.unlink(missing_ok=True)
         if start:
             shutil.copyfile(start, out)
         result = subprocess.run([str(self.args.dejavu), "--no-window", str(self.args.rom), "--movie",
-                                 str(movie), "--frames", str(frames), "--save", str(out)],
+                                 str(movie), "--frames", str(frames), "--save", str(out), *options],
                                 capture_output=True, text=True)
         self.check(result.returncode == 0, f"{name}: the port alone plays it")
         if result.returncode:
@@ -178,13 +201,46 @@ def main():
     run.check((work / "first_bad_out.sav.bak").read_bytes() == damaged(saved, 0),
               "a bad first copy: what it erased is still in .bak")
 
+    # ---- With the fixes, the game's default --------------------------------------------------------
+    fix = ()
+    with_data = bytearray(saved)  # so that the backup and the other files can be seen to be left alone
+    with_data[BACKUP:BACKUP + 0x138] = bytes((i * 3 + 1) & 0xFF for i in range(0x138))
+    file_2 = copy_offset(1, 0)
+    with_data[file_2:file_2 + 0x800] = saved[copy_offset(0, 0):copy_offset(0, 0) + 0x800]
+    with_data = bytes(with_data)
+    (work / "fix_start.sav").write_bytes(damaged(with_data, 0))
+    run.check(good_copies(checked_file(args, work / "fix_start.sav", work / "fix_checked.sav", ORIGINAL), 0) == 0,
+              "a bad copy 0 with --no-fix-save-bugs: the file is gone by the list of files")
+    spoiled = {"a bad copy 0": damaged(with_data, 0), "bad copies 0 and 1": damaged(with_data, 0, 1),
+               "copy 0 all zeros": zeroed(with_data, 0)}
+    for what, start in spoiled.items():
+        path = work / "fix_start.sav"
+        path.write_bytes(start)
+        checked = checked_file(args, path, work / "fix_checked.sav", fix)
+        run.check(good_copies(checked, 0) == 4 and goods(checked) == [COAT],
+                  f"the fixes, {what}: once checked, all 4 copies are good again")
+        run.check(checked[BACKUP:BACKUP + 0x200] == with_data[BACKUP:BACKUP + 0x200],
+                  f"the fixes, {what}: the backup is left alone")
+        run.check(checked[file_2:file_2 + 0x800] == with_data[file_2:file_2 + 0x800],
+                  f"the fixes, {what}: the other files are left alone")
+        out = run.port("continue_save", path, work / "fix_out.sav", fix)
+        run.check(good_copies(out, 0) == 4 and goods(out) == [COAT, GUN],
+                  f"the fixes, {what}: the game carries on from the file")
+    (work / "all_bad.sav").write_bytes(damaged(saved, 0, 1, 2, 3))
+    off = run.port("continue_save", work / "all_bad.sav", work / "all_bad_off.sav")
+    on = run.port("continue_save", work / "all_bad.sav", work / "all_bad_on.sav", fix)
+    run.check(on == off, "the fixes, all 4 copies bad: the same as without them")
+    on = run.port("continue_save", work / "saved.sav", work / "fix_good.sav", fix)
+    run.check(on == resaved, "the fixes, an undamaged file: byte for byte the same as without them")
+
     # A file that can't be this game's save RAM is refused, not overwritten.
     for size in (0, 100, SAVE_SIZE - 1, SAVE_SIZE + 1, 0x8000):
         wrong = work / "wrong.sav"
         wrong.write_bytes(b"\xA5" * size)
         movie, _ = run.movie("new_game_save")
         result = subprocess.run([str(args.dejavu), "--no-window", str(args.rom), "--movie", str(movie),
-                                 "--frames", "120", "--save", str(wrong)], capture_output=True, text=True)
+                                 "--frames", "120", "--save", str(wrong), *ORIGINAL],
+                                capture_output=True, text=True)
         run.check(result.returncode == 1 and wrong.read_bytes() == b"\xA5" * size,
                   f"a {size}-byte save file is refused and left alone")
 

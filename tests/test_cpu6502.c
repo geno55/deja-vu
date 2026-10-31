@@ -184,8 +184,97 @@ static void test_read_order_and_nmi(void) {
   CHECK(c.cycles - before == 7 && c.pc == 0xEC9A && (c.p & kFlagI));
   CHECK(mem[0x1FD] == 0x80 && mem[0x1FC] == 0x02 && mem[0x1FB] == (kFlagC | kFlagU));
 
-  mem[0xEC9A] = 0x02;  // not an official opcode
-  CHECK(cpu_step(&c) == -1 && c.pc == 0xEC9A);
+  mem[0xEC9A] = 0x02;  // freezes the 6502: it stays there
+  CHECK(cpu_step(&c) == 1 && c.pc == 0xEC9A);
+  CHECK(cpu_step(&c) == 1 && c.pc == 0xEC9A);
+}
+
+// Unofficial opcodes a glitch can run, with what the NESdev wiki says they do.
+static void test_unofficial(void) {
+  // Every opcode but the ones that freeze the 6502 goes on, and takes at least 2 cycles.
+  for(int op = 0; op < 256; op++) {
+    uint8_t code[3] = {(uint8_t)op, 0x10, 0x20};
+    Cpu6502 c = load(code, 3);
+    uint64_t before = c.cycles;
+    int r = cpu_step(&c);
+    int freezes = (op & 0x1F) == 0x12 || op == 0x02 || op == 0x22 || op == 0x42 || op == 0x62;
+    if(freezes) {
+      CHECK(r == 1 && c.pc == 0x8000);
+    } else {
+      CHECK(r == 0 && c.cycles >= before + 2);
+    }
+  }
+
+  // NOPs of each size, reading what they address.
+  {
+    uint8_t code[] = {0x80, 0x55, 0x04, 0x20, 0x0C, 0x34, 0x12, 0x1C, 0xFF, 0x10, 0x1A};
+    Cpu6502 c = load(code, sizeof(code));
+    c.x = 1;
+    CHECK(step(&c) == 2 && c.pc == 0x8002);
+    CHECK(step(&c) == 3 && c.pc == 0x8004);
+    CHECK(step(&c) == 4 && c.pc == 0x8007);
+    CHECK(step(&c) == 5 && c.pc == 0x800A);  // crosses a page
+    CHECK(step(&c) == 2 && c.pc == 0x800B);
+  }
+  // LAX and SAX.
+  {
+    uint8_t code[] = {0xA7, 0x20, 0x87, 0x21};
+    Cpu6502 c = load(code, sizeof(code));
+    mem[0x20] = 0x83;
+    CHECK(step(&c) == 3 && c.a == 0x83 && c.x == 0x83 && (c.p & kFlagN));
+    c.x = 0x0F;
+    CHECK(step(&c) == 3 && mem[0x21] == 0x03);
+  }
+  // DCP and ISB.
+  {
+    uint8_t code[] = {0xC7, 0x20, 0xE7, 0x21};
+    Cpu6502 c = load(code, sizeof(code));
+    mem[0x20] = 0x11;
+    mem[0x21] = 0x0F;
+    c.a = 0x10;
+    CHECK(step(&c) == 5 && mem[0x20] == 0x10 && (c.p & kFlagZ) && (c.p & kFlagC));
+    CHECK(step(&c) == 5 && mem[0x21] == 0x10 && c.a == 0x00 && (c.p & kFlagZ) && (c.p & kFlagC));
+  }
+  // SLO, RLA, SRE, RRA.
+  {
+    uint8_t code[] = {0x07, 0x20, 0x27, 0x21, 0x47, 0x22, 0x67, 0x23};
+    Cpu6502 c = load(code, sizeof(code));
+    mem[0x20] = 0x81;
+    c.a = 0x04;
+    CHECK(step(&c) == 5 && mem[0x20] == 0x02 && c.a == 0x06 && (c.p & kFlagC));
+    mem[0x21] = 0x03;
+    CHECK(step(&c) == 5 && mem[0x21] == 0x07 && c.a == 0x06 && !(c.p & kFlagC));
+    mem[0x22] = 0x05;
+    CHECK(step(&c) == 5 && mem[0x22] == 0x02 && c.a == 0x04 && (c.p & kFlagC));
+    mem[0x23] = 0x04;
+    CHECK(step(&c) == 5 && mem[0x23] == 0x82 && c.a == 0x86);
+  }
+  // The immediates: ANC, ALR, ARR, AXS, and SBC at $EB.
+  {
+    uint8_t code[] = {0x0B, 0x80, 0x4B, 0x03, 0x6B, 0xFF, 0xCB, 0x01, 0xEB, 0x01};
+    Cpu6502 c = load(code, sizeof(code));
+    c.a = 0xC0;
+    CHECK(step(&c) == 2 && c.a == 0x80 && (c.p & kFlagC) && (c.p & kFlagN));
+    c.a = 0x03;
+    CHECK(step(&c) == 2 && c.a == 0x01 && (c.p & kFlagC));
+    c.a = 0xC0;
+    c.p &= ~kFlagC;
+    CHECK(step(&c) == 2 && c.a == 0x60 && (c.p & kFlagC) && !(c.p & kFlagV));
+    c.a = 0x0F;
+    c.x = 0x07;
+    CHECK(step(&c) == 2 && c.x == 0x06 && (c.p & kFlagC));
+    c.a = 0x05;
+    c.p |= kFlagC;
+    CHECK(step(&c) == 2 && c.a == 0x04 && (c.p & kFlagC));
+  }
+  // SHX on a page cross: the value goes into the address's high byte too.
+  {
+    uint8_t code[] = {0x9E, 0xFF, 0x05};
+    Cpu6502 c = load(code, sizeof(code));
+    c.x = 0x03;
+    c.y = 0x01;
+    CHECK(step(&c) == 5 && mem[0x0600] == 0 && mem[0x0200] == 0x02);
+  }
 }
 
 int main(void) {
@@ -195,6 +284,7 @@ int main(void) {
   test_shifts_compares();
   test_calls_and_stack();
   test_read_order_and_nmi();
+  test_unofficial();
   if(failures) {
     fprintf(stderr, "test_cpu6502: %d checks failed\n", failures);
     return 1;

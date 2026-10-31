@@ -89,7 +89,8 @@ The code is [harness/ref_mesen.cpp](../harness/ref_mesen.cpp) behind a small C A
   masked to 6 bits, OAM DMA and the attribute byte's missing bits); the controllers with the
   undriven top bits of `$4016`/`$4017` (open bus, `$40` after `lda $4016`); the APU write
   log. It powers on with the reference's power-on memories and registers.
-- **The CPU** ([src/cpu6502.c](../src/cpu6502.c)): official opcodes, standard cycle counts with
+- **The CPU** ([src/cpu6502.c](../src/cpu6502.c)): every opcode, as a glitch can run any byte as
+  code, the unofficial ones from the NESdev wiki; standard cycle counts with
   the page-crossing and branch extras, and bus accesses in the 6502's order (the last byte on
   the bus is what unmapped addresses read back). No dummy reads; the game makes no indexed or
   read-modify-write access to a register where they would matter.
@@ -760,6 +761,10 @@ the NES's 60.0988 frames a second by the clock, with the save RAM kept in a file
   chance. `get_input`, `title_screen` and `ending_wait_button` spin on the controller, and call
   `emu_spin`. Any other such loop gets a frame after 200,000 calls of ported routines with no wait,
   which real work never reaches (at most about 2,500 routines fit in a frame on the console).
+- **Glitches run as 6502 code.** The capsule warp can send the game running through memory, where no
+  port is. Such code gets a frame's worth of cycles and then the frame passes, so a loop in it can't hang
+  the window, and the NMI comes where it is, as on the console. An opcode that freezes a real 6502 freezes
+  the game for good: frames still pass, with no NMI, as on Mesen2. Closing the window still works.
 - **Key repeat counts passes, not frames.** In the command area `key_repeat` counts passes of
   `get_input`'s loop while a direction is held, and the cursor moves on every 128th. So the loop has to
   run at the original's rate: 9 passes a frame. A pass of the original takes about 1,000 cycles

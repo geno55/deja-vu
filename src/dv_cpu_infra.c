@@ -31,6 +31,7 @@ enum {
   kFuzzGiveUp = 20,       // samples through waits with none finished before a routine is left
   kCheckReports = 3,      // differences printed per routine
   kMaxPortedDepth = 500,  // the C stack would run out long before the 6502's wraps
+  kFreeRunFrameCycles = 29781,  // the game on its own: 6502 code gets this much in a frame (a glitch's)
   kSpinGuards = 200000,   // ported routines called with no wait before a frame passes anyway (the game
                           // on its own), for a loop with no wait that emu_spin isn't in; a real frame
                           // of work is far less, since at most about 2,500 fit in one on the console
@@ -52,6 +53,8 @@ static char late_note[200];
 static void (*frame_hook)(void);  // emu_set_frame_hook
 static int free_run;       // emu_run_frame: no reference, so the NMI comes when the game waits
 static int nmi_pending;    // the game has waited, with the NMI on
+static int jammed;         // the game on its own: the 6502 ran an opcode that freezes it
+static uint64_t frame_start_cycle;  // the game on its own: g_nes.cpu.cycles as this frame began
 static unsigned guards_since_wait, spin_passes;
 static unsigned long bad_indexes;
 static int in_nmi;      // between taking an NMI and its RTI
@@ -368,7 +371,7 @@ static void made_up_nmi(void) {
     step();
   }
   if(failed) {
-    longjmp(check_abort, 1);  // made-up data ran into an unknown opcode
+    longjmp(check_abort, 1);  // made-up data ran into an opcode that freezes the 6502
   }
   g_nes.pad[0] ^= 0x01;
 }
@@ -1007,6 +1010,19 @@ static uint16_t run_hook(const EmuHook *h) {
   return next;
 }
 
+// The 6502 ran an opcode that freezes it, which takes a glitch. The game on its own freezes as the
+// console does, for good: frames still pass, with no NMI, so the window stays alive. With a reference
+// or in a check it's a failure, as nothing can line up with that.
+static void cpu_jammed(const Cpu6502 *c) {
+  if(free_run && !in_check && in_game()) {
+    jammed = 1;
+    for(;;) {
+      coro_yield();
+    }
+  }
+  fail("the 6502 froze on opcode $%02X at $%04X", cpu_bus_read(c->pc), c->pc);
+}
+
 // Runs one instruction, or a ported routine in place of the code at pc. Returns what a ported
 // routine returned, or kEmuRts for an instruction. The original runs instead of a ported
 // routine when the reference's next NMI is a lag frame inside it.
@@ -1019,7 +1035,7 @@ static uint16_t step(void) {
   originals_run += h != NULL;
   record(c, NULL);
   if(cpu_step(c)) {
-    fail("unknown opcode $%02X at $%04X", cpu_bus_read(c->pc), c->pc);
+    cpu_jammed(c);
   }
   return kEmuRts;
 }
@@ -1029,7 +1045,7 @@ static void step_original(void) {
   Cpu6502 *c = &g_nes.cpu;
   record(c, NULL);
   if(cpu_step(c)) {
-    fail("unknown opcode $%02X at $%04X", cpu_bus_read(c->pc), c->pc);
+    cpu_jammed(c);
   }
 }
 
@@ -1077,6 +1093,13 @@ static void exec(uint16_t stop_pc, int stop_s, int original_first, int mode) {
       longjmp(check_abort, 1);
     }
     if(in_game() && nmi_point()) {
+      continue;
+    }
+    // On the game's own, 6502 code only runs for a glitch, and may never reach a wait: as on the
+    // console, the frame ends anyway, and the NMI comes where it is.
+    if(free_run && in_game() && c->cycles - frame_start_cycle >= kFreeRunFrameCycles) {
+      guards_since_wait = 0;
+      coro_yield();
       continue;
     }
     if(in_check && c->cycles - check_start > check_limit) {
@@ -1134,7 +1157,7 @@ int emu_run_frame(char *err, size_t err_size) {
   Cpu6502 *c = &g_nes.cpu;
   free_run = 1;
   if(!failed) {
-    if(nmi_pending) {
+    if(nmi_pending && !jammed) {
       cpu_nmi(c);
       in_nmi = 1;
       run_nmi_handler();
@@ -1143,6 +1166,7 @@ int emu_run_frame(char *err, size_t err_size) {
     }
   }
   if(!failed) {
+    frame_start_cycle = c->cycles;
     coro_resume(game);
     nmi_pending = g_nes.ppu_ctrl & 0x80;
   }
@@ -1163,6 +1187,7 @@ int emu_start(void) {
   coro_destroy(game);
   game = coro_create(game_main, NULL, kGameStack);
   failed = 0;
+  jammed = 0;
   in_nmi = in_handler = 0;
   ported_depth = c_ran = 0;
   target_set = 0;

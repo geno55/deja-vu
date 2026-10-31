@@ -97,12 +97,14 @@ In these examples, `dejavu` means the program, so use its full path unless you'r
 | `dejavu path/to/rom.nes` | Uses this ROM, if yours isn't in the `deja-vu` folder when you build. You only need to do this once. |
 | `--scale N` | Sets the window to N times the NES picture (the default is 3). You can also resize the window by dragging it. |
 | `--save FILE` | Uses this save file. |
+| `--no-fix-save-bugs` | Keeps two bugs in the original's save check, where a damaged save file is erased or hangs the game. They're fixed by default. |
 | `--help` | Lists every option. |
 
 ## How close is it to the NES?
 The game was compared frame by frame with the original running in the Mesen2 emulator, using two recorded
 speedruns. The picture matched pixel for pixel, apart from 11 frames in the run that relies on glitches.
-The colors and sound were also compared by eye and ear. The game's own bugs and quirks are kept.
+The colors and sound were also compared by eye and ear. The game's own bugs and quirks are kept, apart from two in its save check, which are fixed by default (see
+[Options](#options)).
 
 There are a few differences:
 - **Slow moments are faster.** Work that took the NES more than a frame now finishes at once, most
