@@ -123,6 +123,75 @@ static void record(const Cpu6502 *c, const char *ported) {
   }
 }
 
+enum {
+  kCoverFlagCount = 6,
+  kScriptLoopAddr = 0xCBB1,       // script_loop (7:CBB1)
+  kScriptRunOpcodeAddr = 0xCBBC,  // script_run_opcode (7:CBBC)
+};
+static const uint32_t kNoScriptOp = 0xFFFFFFFFu;
+
+static uint8_t *coverage;        // emu_set_coverage
+static uint32_t *coverage_log;   // the marks this fuzz sample made, which go if it isn't compared
+static size_t coverage_log_len;
+static uint32_t coverage_op;     // where script_run_opcode last ran an opcode, or kNoScriptOp
+
+void emu_set_coverage(uint8_t *flags) {
+  coverage = flags;
+  coverage_log_len = 0;
+  coverage_op = kNoScriptOp;
+  if(flags && !coverage_log) {  // a mark logs once, as it stays set unless undone: this always fits
+    coverage_log = malloc(sizeof(*coverage_log) * kPrgSize * kCoverFlagCount);
+  }
+}
+
+static void cover(uint32_t offset, uint8_t flag) {
+  if(!(coverage[offset] & flag)) {
+    coverage[offset] |= flag;
+    coverage_log[coverage_log_len++] = offset << 8 | flag;
+  }
+}
+
+static void coverage_undo(void) {
+  while(coverage_log_len) {
+    uint32_t mark = coverage_log[--coverage_log_len];
+    coverage[mark >> 8] &= (uint8_t)~mark;
+  }
+}
+
+// script_run_opcode has fetched an opcode, so it lies just behind script_ptr; back at script_loop, script_ptr is the
+// next one.
+static void cover_script(uint16_t pc) {
+  uint16_t next = (uint16_t)(script_ptr[0] | script_ptr[1] << 8);
+  if(next <= 0x8000) {
+    coverage_op = kNoScriptOp;
+  } else if(pc == kScriptRunOpcodeAddr) {
+    coverage_op = nes_prg_offset((uint16_t)(next - 1));
+    cover(coverage_op, kCoverScriptOp);
+  } else if(coverage_op != kNoScriptOp) {
+    cover(coverage_op, nes_prg_offset(next) == coverage_op + 3 ? kCoverScriptNext : kCoverScriptJump);
+    coverage_op = kNoScriptOp;
+  }
+}
+
+// cpu_step, keeping the record.
+static int covered_step(Cpu6502 *c) {
+  uint16_t pc = c->pc;
+  if(!coverage || pc < 0x8000) {
+    return cpu_step(c);
+  }
+  uint32_t offset = nes_prg_offset(pc);
+  cover(offset, kCoverRan);
+  if(pc == kScriptRunOpcodeAddr || pc == kScriptLoopAddr) {
+    cover_script(pc);
+  }
+  int is_branch = (g_nes.prg[offset] & 0x1F) == 0x10;
+  int frozen = cpu_step(c);
+  if(is_branch) {
+    cover(offset, c->pc == (uint16_t)(pc + 2) ? kCoverFellThrough : kCoverBranched);
+  }
+  return frozen;
+}
+
 void emu_push(uint8_t v) {
   cpu_bus_write(0x100 | g_nes.cpu.s--, v);
 }
@@ -478,7 +547,7 @@ static void run_original(const EmuHook *h) {
   uint16_t ret = (uint16_t)((g_nes.ram[0x100 | (uint8_t)(s1 - 1)] |
                              g_nes.ram[0x100 | s1] << 8) + !rti);
   check_start = c->cycles;
-  if(cpu_step(c)) {  // the original's first instruction, where the hook is
+  if(covered_step(c)) {  // the original's first instruction, where the hook is
     longjmp(check_abort, 1);
   }
   while(!(c->pc == ret && c->s == s1)) {
@@ -847,6 +916,8 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
       break;
     }
     g_nes = base;
+    coverage_log_len = 0;
+    coverage_op = kNoScriptOp;
     for(int a = 0; a < 0x800; a++) {
       g_nes.ram[a] = fuzz_byte();
     }
@@ -949,6 +1020,7 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
     // jump table's end, code runs from whatever the bytes there say, on a stack that differs
     // under C frames: nothing to learn from comparing that.
     if(phase == 0 || phase == 3 || unfair_read || sample_astray) {
+      coverage_undo();
       counts->skipped++;
       continue;
     }
@@ -1035,7 +1107,7 @@ static uint16_t step(void) {
   }
   originals_run += h != NULL;
   record(c, NULL);
-  if(cpu_step(c)) {
+  if(covered_step(c)) {
     cpu_jammed(c);
   }
   return kEmuRts;
@@ -1045,7 +1117,7 @@ static uint16_t step(void) {
 static void step_original(void) {
   Cpu6502 *c = &g_nes.cpu;
   record(c, NULL);
-  if(cpu_step(c)) {
+  if(covered_step(c)) {
     cpu_jammed(c);
   }
 }

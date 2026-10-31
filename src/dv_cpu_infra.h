@@ -280,6 +280,19 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
 // stderr (in each pass that has that sample). The name must stay alive.
 void emu_set_fuzz_trace(const char *name, unsigned sample);
 
+// Keeps a record of what original code runs, for tools/coverage.py: `flags` has a byte for each byte of PRG
+// (zeroed by the caller), and gets these. A fuzz sample's marks count only if the sample was compared.
+// NULL stops it.
+enum {
+  kCoverRan = 0x01,          // an instruction ran from here
+  kCoverBranched = 0x02,     // a branch here jumped
+  kCoverFellThrough = 0x04,  // a branch here didn't
+  kCoverScriptOp = 0x08,     // the script opcode here ran
+  kCoverScriptNext = 0x10,   // the next opcode after it was 3 bytes on, as a goto_if's is when it doesn't jump
+  kCoverScriptJump = 0x20,   // the next opcode after it was anywhere else
+};
+void emu_set_coverage(uint8_t *flags);
+
 // How often a ported routine ran as original code because the reference's next NMI was a lag
 // frame in it: whole calls, and the rest of a call after a wait (emu_resume_original).
 void emu_original_counts(unsigned long *run, unsigned long *resumed);

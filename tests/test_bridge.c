@@ -477,12 +477,47 @@ static void test_fuzz_through_waits(void) {
   emu_set_hooks(NULL, 0);
 }
 
+// What ran is marked, by the way each branch went, and a fuzz sample's marks only stay if it was compared.
+static void test_coverage(void) {
+  static uint8_t flags[kPrgSize];
+  enum { kBank7 = 0x1C000 - 0xC000 };
+  memset(flags, 0, sizeof(flags));
+  emu_set_hooks(NULL, 0);
+  power_on();
+  emu_set_coverage(flags);
+  EmuTaken t;
+  EmuNmi wait = nmi(0xEBA4, 0x02, 0xF9);
+  CHECK(run(&wait, &t) == 0);
+  CHECK(flags[kBank7 + 0xE000] == kCoverRan);
+  CHECK(flags[kBank7 + 0xE001] == 0);  // an operand
+  CHECK(flags[kBank7 + 0xE00D] == (kCoverRan | kCoverBranched | kCoverFellThrough));  // bne $E007, both ways
+  CHECK(flags[kBank7 + 0xE012] == 0);  // after the wait, which hasn't ended
+
+  static const EmuHook kHooks[] = {
+    {"waits_inside", 0xE120, 0xE131, 7, c_waits_inside},
+    {"wait_vblank", 0xEB9C, 0xEBA9, 7, c_wait_vblank},
+  };
+  emu_set_hooks(kHooks, 2);
+  power_on();
+  memset(flags, 0, sizeof(flags));
+  emu_set_coverage(flags);
+  EmuFuzzCounts counts;
+  emu_fuzz_port(0, 100, 1, 0, &counts);  // all skipped: the original waits
+  CHECK(counts.compared == 0 && flags[kBank7 + 0xE120] == 0);
+  emu_fuzz_port(0, 100, 1, 1, &counts);  // through waits: all compared
+  CHECK(counts.compared == 100 && flags[kBank7 + 0xE120] == kCoverRan);
+  CHECK(flags[kBank7 + 0xE12A] == (kCoverRan | kCoverBranched | kCoverFellThrough));
+  emu_set_coverage(NULL);
+  emu_set_hooks(NULL, 0);
+}
+
 int main(void) {
   make_rom();
   test_pass_through();
   test_ported();
   test_ported_nmi();
   test_fuzz_through_waits();
+  test_coverage();
   if(failures) {
     fprintf(stderr, "test_bridge: %d checks failed\n", failures);
     return 1;

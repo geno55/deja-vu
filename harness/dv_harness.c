@@ -38,6 +38,8 @@
 // --fuzz-only NAME[,NAME...]  with --fuzz-ports: only these routines.
 // --fuzz-trace NAME:SAMPLE  with --fuzz-ports: prints every instruction of that sample of that
 //            routine, as the report of a difference names it, under the original and the port.
+// --coverage FILE  write a record of what original code ran under comparison (emu_set_coverage), a byte
+//            for each byte of PRG, for tools/coverage.py.
 // --free-run  with --compare: the C side runs on its own (emu_run_frame), not told where NMIs go, and
 //            the run stops at the first difference. An NMI in the game's spins on the controller
 //            isn't compared, as the reference is partway through a read there; the C side spins too,
@@ -787,14 +789,14 @@ static void usage(void) {
                   "                  [--pass-through] [--emulate NAME[,NAME...]]\n"
                   "                  [--check-ports] [--fuzz-ports N] [--fuzz-only NAME[,NAME...]]\n"
                   "                  [--fuzz-trace NAME:SAMPLE] [--picture] [--picture-dump DIR]\n"
-                  "                  [--apu] [--audio-wav PREFIX] [--check-palette]\n"
+                  "                  [--apu] [--audio-wav PREFIX] [--check-palette] [--coverage FILE]\n"
                   "                  [--sav FILE] [--sav-out FILE] [--rom ROM] [--home DIR]\n");
   exit(2);
 }
 
 int main(int argc, char **argv) {
   const char *rom = DV_DEFAULT_ROM, *home = DV_DEFAULT_HOME;
-  const char *movie_path = NULL, *log_path = NULL, *emulate = "", *fuzz_only = NULL;
+  const char *movie_path = NULL, *log_path = NULL, *emulate = "", *fuzz_only = NULL, *coverage_path = NULL;
   long frames = -1, rewind = 0, fuzz = 0;
   int compare = 0, keep_going = 0, pass_through = 0, check_ports = 0, picture = 0, free_run = 0;
   int apu_check = 0;
@@ -847,6 +849,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(arg, "--emulate")) emulate = val;
     else if(!strcmp(arg, "--fuzz-ports")) fuzz = atol(val);
     else if(!strcmp(arg, "--fuzz-only")) fuzz_only = val;
+    else if(!strcmp(arg, "--coverage")) coverage_path = val;
     else if(!strcmp(arg, "--picture-dump")) picture_dir = val;
     else if(!strcmp(arg, "--sav")) sav_path = val;
     else if(!strcmp(arg, "--sav-out")) sav_out = val;
@@ -870,6 +873,8 @@ int main(int argc, char **argv) {
   size_t ported_count = pass_through ? 0 : c_choose_ported(emulate, ported);
   emu_set_hooks(ported, ported_count);
   emu_set_port_check(check_ports);
+  uint8_t *coverage = coverage_path ? calloc(kPrgSize, 1) : NULL;
+  emu_set_coverage(coverage);
   if(picture) {
     emu_set_frame_hook(c_render);
     if(picture_dir) {
@@ -1176,6 +1181,18 @@ int main(int argc, char **argv) {
     if(picture_diffs) {
       fclose(picture_diffs);
     }
+  }
+  if(coverage) {
+    FILE *f = fopen(coverage_path, "wb");
+    if(!f || fwrite(coverage, 1, kPrgSize, f) != kPrgSize) {
+      fprintf(stderr, "dv_harness: can't write %s\n", coverage_path);
+      status = 1;
+    }
+    if(f) {
+      fclose(f);
+    }
+    emu_set_coverage(NULL);
+    free(coverage);
   }
   print_progress(r);
   ref_close(r, sav_out);

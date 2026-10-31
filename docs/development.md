@@ -54,6 +54,37 @@ That is the tests, both movies with port checks, the picture and the sound, agai
 `--pass-through`, the fuzz, the palette and the save movies (with `Mesen.exe` too, if `MESEN` is set). Each
 job's output is in `build/checks/`. Its docstring has the options, and `--only` runs some of them.
 
+## How much the checks reach
+Passing says little about code that never ran. This says what ran:
+
+```
+python tools/coverage.py
+```
+
+It runs the movies in `--pass-through` and the fuzz with `--coverage`, in about 3 minutes, and counts instructions, branch
+directions, routines and script opcodes from a listing of `asm/`. `build/coverage/report.txt` lists every routine with
+something unrun, every branch not seen both ways and every script opcode that never ran. Its docstring says what
+counts as compared. The movies are counted apart from the fuzz, as a path only the fuzz takes may be one the game
+can't reach.
+
+On 2026-10-31:
+
+| | Instructions (of 9,820) | Branches both ways (of 824) |
+|---|---|---|
+| Movies | 78.9% | 47.1% |
+| Fuzz | 87.3% | 72.7% |
+| Either | 93.2% | 79.1% |
+
+In the movies, 1,179 of 4,668 script opcodes ran (25.3%), and of 972 `goto_if`s, 55 went both ways and 690 never ran. They are
+speedruns, so most of the game's script content has never been compared, and that includes 26 of the 91 opcode
+numbers the scripts use. Those handlers are fuzzed as routines, but not with real scripts.
+
+The record agrees with `Mesen.exe` on the same movies. The script opcodes that ran are the same in both (from
+`run_mesen.py --trace-scripts`). So are the instructions (from its code log), but for one in `ending_sequence` in #1260. That run
+of Mesen.exe plays 300 frames past the movie's end, which is probably why (a guess: not looked into).
+
+It doesn't measure the C: a branch that exists only in a port isn't seen.
+
 ## Rebuilding the ROM from the assembly
 `asm/` holds the game's code and small tables as ca65 source, one file per 16 KB bank
 (`bank0.s` ... `bank7.s`), plus the header, the CHR ROM include and the linker configuration.
