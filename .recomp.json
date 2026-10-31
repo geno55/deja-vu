@@ -1,0 +1,19 @@
+{
+  "$schema": "https://recomp.fyi/schema/v1.json",
+  "game": "Déjà Vu",
+  "wikidata": "Q1571488",
+  "system": "NES",
+  "type": ["decomp", "port"],
+  "original": {
+    "region": "USA",
+    "sha1": "c8ca009cfb56edb86acd8bb8f05d96d19132ad66"
+  },
+  "project": "Deja Vu for PC",
+  "status": "playable",
+  "targets": ["Windows"],
+  "toolchain": "cc65",
+  "approach": "Matching disassembly, and C that mirrors it, checked frame by frame against Mesen2",
+  "started": "2026-10-29",
+  "maintainers": [{ "name": "geno55", "link": "https://github.com/geno55" }],
+  "notes": "The disassembly rebuilds the original byte for byte. The port matches Mesen2 at every NMI of two TAS movies and three scripted save runs, but hasn't been played to the end by hand yet. You need your own copy of the game. The SHA-1 leaves out the 16-byte header."
+}
