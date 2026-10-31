@@ -43,6 +43,17 @@ That writes `build/dejavu_v0.1.0.zip`, from a fixed list of files so that the bu
 `dejavu_assets.dat` can't go in. It refuses a program with no window, one that needs Visual C++'s runtime,
 or one holding a run of the ROM's bytes. Then tag the commit and attach the zip to a GitHub release.
 
+## Running every check
+With a harness build, the ROM and the converted movies, this runs the lot side by side and says what failed:
+
+```
+python tools/run_checks.py
+```
+
+That is the tests, both movies with port checks, the picture and the sound, again with `--emulate` and with
+`--pass-through`, the fuzz, the palette and the save movies (with `Mesen.exe` too, if `MESEN` is set). Each
+job's output is in `build/checks/`. Its docstring has the options, and `--only` runs some of them.
+
 ## Rebuilding the ROM from the assembly
 `asm/` holds the game's code and small tables as ca65 source, one file per 16 KB bank
 (`bank0.s` ... `bank7.s`), plus the header, the CHR ROM include and the linker configuration.
