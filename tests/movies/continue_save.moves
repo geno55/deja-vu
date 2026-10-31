@@ -1,0 +1,18 @@
+# From new_game_save's save file: continue file 1, take the gun from the coat too, and save again.
+
+# The logos, then the title, which Start ends.
+.:900 T:4 .:300
+# File 1 is good, so A opens its menu, and A on CONTINUE loads it.
+A:4 .:120 A:4 .:300
+
+# Choose TAKE: from EXAM, down, right, A.
+D:3 .:20 R:3 .:20 A:3 .:30
+# Up twice leaves the commands for the picture. Up and right, to where the coat was.
+U:3 .:20 U:3 .:20 .:30 U:30 R:12 .:10
+# Click it, and press A through the messages.
+A:3 .:240 A:3 .:300 A:3 .:300 A:3 .:120
+
+# Down out of the picture lands on OPEN. Right, right, down, down is SAVE.
+D:42 .:20 R:3 .:20 R:3 .:20 D:3 .:20 D:3 .:20
+# Click SAVE, and A on the dialog's YES.
+A:3 .:200 A:3 .:300

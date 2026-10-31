@@ -1,0 +1,115 @@
+# Names for addresses in Deja Vu's PRG ROM, used by tools/disasm.py and tools/make_asm.py.
+# asm/bank*.s were generated with these names and are the source now: rename things there.
+# This file still feeds the analysis tools (tools/disasm.py's listings in build/asm).
+# Format: <bank>:<address> <name> [; comment]
+# Bank 7 is the fixed bank ($C000-$FFFF); banks 0-6 switch into $8000-$BFFF.
+# Names here override the tracer's automatic ones (draw_cursor, ...).
+
+# Vectors and startup
+7:E800 reset
+7:EC9A nmi                     ; OAM DMA, PPU updates, sprite-0 split
+7:EB40 irq                     ; bare RTI: the MMC3 scanline IRQ is unused
+7:E600 main                    ; reset jumps here after hardware init
+
+# Mapper (MMC3)
+7:E87B set_mirroring_vertical
+7:E88B set_mirroring_horizontal
+7:E89B switch_prg_bank         ; A = 16 KB bank for $8000-$BFFF
+7:E8BF apply_chr_banks_r0_r1   ; from shadow copies $0104/$0106
+7:E8DA apply_chr_banks_r2_r5   ; from shadow copies $0108-$010B
+7:E8FF mmc3_set_bank           ; A = register, X = bank; keeps mode bits in $010C
+7:E916 set_chr_banks_inline    ; 8 bank numbers follow the JSR; returns after them
+7:E97D apply_chr_banks
+7:EAD0 push_and_switch_bank    ; A = bank; remembers the current one
+7:EAEA pop_bank
+
+# Inline-data helpers
+7:E984 advance_inline_ptr      ; $37/$38 += 1
+7:E992 draw_rle_screen_2400    ; RLE nametable follows the JSR (no callers found)
+7:E9D5 draw_rle_screen_2000    ; RLE nametable follows the JSR; returns to caller's caller
+7:EA18 rle_to_ppu_2000
+7:EA75 rle_to_ppu_2400
+7:EAC6 read_inline_byte
+7:EBE6 jump_table              ; A = index; table of addresses follows the JSR
+7:FADA sound_jump_table        ; same pattern, used by the sound code
+
+# Frame sync and input
+7:EB41 read_joypads            ; reads twice until both reads match
+7:EB6E read_joypads_once
+7:EB9C wait_vblank             ; sets $F0 bit 1, waits for the NMI to clear it
+7:EBB9 wait_vblank_and_hide_sprites
+
+# Far calls: A = id; bank = id >> 4, entry = id & 15 of the table at the start of that bank
+7:F3B5 far_call_8000
+7:F3C5 far_call_8020
+7:F3D5 far_call_8040
+7:F3E5 far_call_8400
+7:EC03 far_call_8000_body
+7:EC27 far_call_8020_body
+7:EC4B far_call_8040_body
+7:EC6F far_call_8400_body
+7:EC93 far_call_jump
+
+# Scene pictures (format in docs/scenes.md)
+7:C076 load_scene              ; draw the picture for $0515
+7:C09F select_scene_bank       ; switch to the bank holding $0515; $75 = index in it
+7:C0CE scene_pointer           ; ($55) = picture $75 of the current bank
+7:C0DD draw_scene_dissolve     ; tile by tile; all $FF when $7D is set
+7:C186 load_scene_attrs
+7:C1CC draw_scene              ; all at once
+7:C1F4 copy_scene_tiles        ; 196 bytes to $0554
+7:C201 apply_room_settings
+
+# Sound (format in docs/sound.md)
+7:F409 play_sound              ; A = sound number from 1; 0 stops all
+7:F44D start_sound             ; $44 = number - 1
+7:F538 sound_update            ; from the NMI
+7:F7C0 sound_read_command      ; next command of the channel at X
+
+# Screen layouts (tools/layouts.py)
+7:FBF0 draw_layout             ; A = layout number, table at 6:BC00
+7:FC88 layout_command
+
+# Text (format in docs/text.md)
+7:C4AE print_message_5         ; A = message id, table at 5:9A00
+7:C4EF print_message_4         ; A = message id, table at 4:8000
+7:C501 print_message_2_or_5    ; A >= $80: 2:A500 entry A & $7F; else 5:9A00 entry A | $80
+7:C4BC print_message_from      ; $84 = bank, $70/$71 = table, $BF = id
+7:DF00 text_read_code          ; next character code from the bit stream at ($00)
+7:DF34 text_read_byte          ; next 8 bits as a byte
+7:DF4C text_read_bit           ; next bit into $3F; $3E = bit buffer, $3D = bits used
+7:DF74 print_message           ; ($00) = message; prints until an end code
+7:E080 print_name              ; 8 tiles at ($87), $FF ends early
+7:E195 clear_text_window
+7:E1F2 print_tile              ; $0620 = tile
+7:E1FE print_char              ; $061A = character code
+7:E0BC text_wait_page
+7:E0D8 text_newline
+
+# Script interpreter
+7:CBB1 script_loop             ; runs opcodes until $FF
+7:CBC2 script_fetch_byte       ; A = byte at ($B6), pointer advances
+7:CBCA script_advance          ; ($B6) += A
+7:CC17 script_dispatch         ; A = opcode; 105-entry jump table follows
+7:CB5C script_resume           ; continue a script after a yield (opcode $28/$48)
+7:CB64 script_start            ; pick a script by $AA/$AB/$BC from the tables in bank 3
+7:CBD8 script_fetch_2          ; operand bytes into $B8-$B9
+7:CBE8 script_fetch_3          ; into $B8-$BA
+7:CBFD script_fetch_4          ; into $B8-$BB
+7:CDE0 script_op_switch        ; opcode $29
+7:CE01 script_op_yield         ; opcode $28
+7:CF9C script_op_goto_if       ; opcodes $03, $04
+7:CFA6 script_op_goto_if_not   ; opcode $05
+7:CFB0 script_goto             ; ($B6) = $B8/$B9
+7:CFB9 script_op_push_goto     ; opcode $65
+7:CFCA script_op_pop_goto      ; opcode $66
+7:CFD8 script_op_goto          ; opcode $1C
+7:CFDF script_condition_true   ; sets bit 2 of $B5
+7:CFE6 script_condition_false  ; clears bit 2 of $B5
+7:D141 select_story_flags              ; A = bit number; ($61) = $0450
+7:D28D select_door_flags
+7:D2D0 select_event_flags
+7:D45D select_flags_045C
+7:D49B select_flags_047A
+7:D14C test_flag_bit           ; condition = bit $B8 of the array at ($61)
+7:D163 load_flag_byte          ; A = byte holding bit $B8, X = bit within it

@@ -1,0 +1,16 @@
+# From new_game_save's save file: every way through the file menu, ending with file 1 erased.
+
+# The logos, then the title, which Start ends.
+.:900 T:4 .:300
+
+# File 1's menu. Down to EXIT, and A goes back to the list.
+A:4 .:120 D:3 .:20 A:4 .:120
+# File 1's menu again. Up from CONTINUE wraps to NEW GAME: it asks first, and NO keeps the file.
+A:4 .:120 U:3 .:20 A:4 .:120 D:3 .:20 A:4 .:120
+# Again, with YES: the file is erased, and the list shows it empty.
+A:4 .:120 U:3 .:20 A:4 .:120 A:4 .:300
+
+# Down to file 2 and back up to file 1, then up past the top to file 3 and down again.
+D:3 .:20 U:3 .:20 U:3 .:20 D:3 .:20
+# File 1 is empty now, so A starts a new game in it. The first page of the opening text is enough.
+A:4 .:300 A:3 .:120

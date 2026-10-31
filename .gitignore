@@ -1,0 +1,16 @@
+# Never commit game data
+*.nes
+*.NES
+*.sav
+*.sav.*
+dejavu_assets.dat*
+*.mss
+
+# Mesen2 (GPL-3.0) is fetched here for harness builds only; never commit it
+external/
+
+# Build output
+build/
+out/
+.vs/
+__pycache__/

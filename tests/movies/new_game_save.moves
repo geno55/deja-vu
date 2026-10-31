@@ -1,0 +1,21 @@
+# From an empty save file: a new game in file 1, take the coat, and save.
+
+# The logos, then the title, which Start ends.
+.:900 T:4 .:300
+# File 1 is empty, so A starts a new game.
+A:4 .:300
+# The opening text: a press for each page. The last ones click EXAM, which does nothing yet.
+40x A:3 .:60
+.:120
+
+# Choose TAKE: from EXAM, down, right, A.
+D:3 .:20 R:3 .:20 A:3 .:30
+# Up twice leaves the commands for the picture, at the bottom of the coat. Up and right onto it.
+U:3 .:20 U:3 .:20 .:30 U:30 R:12 .:10
+# Click it, and press A through the messages about it.
+A:3 .:240 A:3 .:300 A:3 .:300 A:3 .:120
+
+# Down out of the picture lands on OPEN. Right, right, down, down is SAVE.
+D:42 .:20 R:3 .:20 R:3 .:20 D:3 .:20 D:3 .:20
+# Click SAVE, and A on the dialog's YES.
+A:3 .:200 A:3 .:300

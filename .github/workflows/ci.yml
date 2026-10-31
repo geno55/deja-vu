@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS minutes are costly on private repos, so it runs only on manual runs.
+        os: ${{ github.event_name == 'workflow_dispatch'
+                && fromJSON('["windows-latest", "ubuntu-latest", "macos-latest"]')
+                || fromJSON('["windows-latest", "ubuntu-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # So the window's code gets compiled here too. On Windows CI builds with no window.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev
+      - run: cmake -S . -B build
+      - run: cmake --build build --config Release
+      # No ROM in CI, so the rom_hash test is skipped here.
+      - run: ctest --test-dir build -C Release --output-on-failure
