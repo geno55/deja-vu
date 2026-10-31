@@ -3,7 +3,7 @@
 
 usage: make_release.py VERSION [--build DIR] [--rom PATH] [--out FILE]
 
-VERSION is the tag the zip is for, as zelda3 names them (v0.1-beta, v0.3); the zip is
+VERSION is the tag the zip is for (v0.1.0, or v0.3 or v0.2-beta); the zip is
 build/dejavu_VERSION.zip. There's no version in the program: the tag and the zip's name are the version.
 
 Only the files in the list go in, so the build folder's dejavu_assets.dat, a copy of the game's data,
@@ -74,8 +74,8 @@ def main():
     ap.add_argument("--rom", type=Path, default=REPO / "Deja Vu (USA).nes")
     ap.add_argument("--out", type=Path)
     args = ap.parse_args()
-    if not re.fullmatch(r"v\d+\.\d+(-beta)?", args.version):
-        sys.exit(f"make_release: {args.version} isn't a version like v0.1-beta or v0.3")
+    if not re.fullmatch(r"v\d+\.\d+(\.\d+)?(-beta)?", args.version):
+        sys.exit(f"make_release: {args.version} isn't a version like v0.1.0")
     out = args.out or args.build / f"dejavu_{args.version}.zip"
     try:
         files = release_files(args.build, REPO)

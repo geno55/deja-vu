@@ -4,10 +4,21 @@ Play the NES version of *Deja Vu*, the point-and-click detective mystery, as a n
 computer, with no emulator. It's the original game rewritten in C, and it looks, sounds and plays like
 the NES version.
 
-You need your own copy of the game. This project includes none of the game's data.
+You need your own copy of the game. The pictures, text, music and other large data aren't included: they
+come from your own ROM.
 
-## Get started
-There are no ready-made downloads yet, so you build the game yourself. It takes a few minutes.
+## Download for Windows
+1. Download the zip from the [releases page](https://github.com/geno55/deja-vu/releases) and unzip it.
+2. Copy your dump of *Deja Vu (USA)* for the NES into that folder, and name it `Deja Vu (USA).nes`.
+3. Run `dejavu.exe`.
+
+Windows may warn you about an unrecognized program, because the download isn't signed.
+
+After the first run, the game no longer needs your ROM. It keeps what it needs in `dejavu_assets.dat` next
+to the program. That file is a copy of the game's data, so please don't share it.
+
+## Build it yourself
+On other systems, or to work on the game, build it from source. It takes a few minutes.
 
 **1. Install the tools.** You need [Git](https://git-scm.com/downloads),
 [CMake](https://cmake.org/download/) 3.20 or newer, [Python 3](https://www.python.org/downloads/) and a C
@@ -47,9 +58,6 @@ cmake --build build --config Release
 
 **6. Play.** On Windows, run `build/Release/dejavu`. On Linux and macOS, run `build/dejavu`.
 
-After the first build, the game no longer needs your ROM. It keeps what it needs in `dejavu_assets.dat`
-next to the program. That file is a copy of the game's data, so please don't share it.
-
 It has been played on Windows. Linux builds are tested automatically, and macOS builds less often.
 
 ## Controls
@@ -82,7 +90,7 @@ emulator's `.sav`. Copy one over and rename it, in either direction. This has be
 other emulators should work the same way, but haven't been tried. More in [docs/saves.md](docs/saves.md).
 
 ## Options
-In these examples, `dejavu` means the program from step 6, so use its full path unless you've moved it.
+In these examples, `dejavu` means the program, so use its full path unless you're in its folder.
 
 | Option | What it does |
 |---|---|
@@ -122,5 +130,5 @@ This game was rebuilt from a matching disassembly and checked against the origin
 and running the comparison harness.
 
 ## License
-MIT; see [LICENSE](LICENSE). *Deja Vu* itself belongs to its owners, and this project includes none of its
-data. Mesen2 (GPL-3.0) is used only by the comparison harness and isn't part of the game.
+MIT; see [LICENSE](LICENSE). *Deja Vu* itself belongs to its owners, and the large data has to come from your
+own ROM. Mesen2 (GPL-3.0) is used only by the comparison harness and isn't part of the game.

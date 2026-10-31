@@ -36,10 +36,10 @@ no version in the program. On Windows, with SDL2 fetched and not `DV_HARNESS`:
 cmake -S . -B build
 cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
-python tools/make_release.py v0.1-beta
+python tools/make_release.py v0.1.0
 ```
 
-That writes `build/dejavu_v0.1-beta.zip`, from a fixed list of files so that the build folder's
+That writes `build/dejavu_v0.1.0.zip`, from a fixed list of files so that the build folder's
 `dejavu_assets.dat` can't go in. It refuses a program with no window, one that needs Visual C++'s runtime,
 or one holding a run of the ROM's bytes. Then tag the commit and attach the zip to a GitHub release.
 
