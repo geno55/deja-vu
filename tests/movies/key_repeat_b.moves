@@ -1,0 +1,11 @@
+# As key_repeat.moves, with B pressed just after each direction and held to its end. The press changes the steps: the
+# cursor ends on the first command, not a row below, and Mesen2 agrees.
+
+# The logos, the title, a new game, and the opening text.
+.:900 T:4 .:300
+A:4 .:300
+40x A:3 .:60
+.:120
+
+D:1 BD:28 .:60
+U:1 BU:26 .:60

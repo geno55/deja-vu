@@ -54,6 +54,21 @@ That is the tests, both movies with port checks, the picture and the sound, agai
 `--pass-through`, the fuzz, the palette and the save movies (with `Mesen.exe` too, if `MESEN` is set). Each
 job's output is in `build/checks/`. Its docstring has the options, and `--only` runs some of them.
 
+## The program itself
+The harness checks the game's logic, with lag placed from the reference. It can't check `dejavu`, which has no lag: a TAS movie's
+presses are timed to the frame, and it soon misses one (at about 940 frames with lag frames left out, when tried).
+`tests/run_play_movies.py` plays scripts with a margin around each press through the program with `--no-window`, and in
+lockstep, and compares where they end: the game's state, save RAM, nametables, palette, OAM and the cursor. Other RAM
+may differ, as lag moves the counters and the sound along, and it prints which. It's in `tools/run_checks.py`. Plain ctest
+runs the program's half, and checks that `key_repeat` and `key_repeat_b` end the cursor where Mesen2 does.
+
+The scripts hold A and B through the title and text, and hold them while moving. They take things, open a door, walk to the next
+room and use a command on an item. No script reaches a death yet. A press of B while a direction is held changes the
+cursor's steps on the commands (`key_repeat_b`), on Mesen2 as on the program.
+
+It doesn't test the window, real-time pacing or sound output, as it runs with `--no-window`, and the scripts' margins
+mean it says nothing about play timed to the frame.
+
 ## How much the checks reach
 Passing says little about code that never ran. This says what ran:
 

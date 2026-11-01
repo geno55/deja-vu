@@ -1,0 +1,33 @@
+# Ordinary play for a few minutes: taking things, the door, walking to the next room, and a command on an item.
+# A click's message clears with a press, so each click here has an even number of presses.
+
+# The logos, the title, a new game, and the opening text.
+.:900 T:4 .:300
+A:4 .:300
+40x A:3 .:60
+.:120
+
+# Choose TAKE: from EXAM, down, right, A. Up twice leaves the commands for the picture. Up and right onto the coat.
+D:3 .:20 R:3 .:20 A:3 .:30
+U:3 .:20 U:3 .:20 .:30 U:30 R:12 .:10
+# Click it, and press A through the messages.
+A:3 .:240 A:3 .:300 A:3 .:300 A:3 .:120
+# Take the gun from where the coat was: the cursor is still there.
+A:3 .:240 A:3 .:300 A:3 .:300 A:3 .:120
+
+# Down out of the picture lands on OPEN. A on it, then the door, above and to the left of the coat.
+D:42 .:20 A:3 .:30
+U:3 .:20 U:3 .:20 .:30 U:30 L:30 .:10
+A:3 .:240 A:3 .:120
+
+# Down out of the picture onto EXAM, right twice to MOVE, and click it. Then up out of the commands into the picture, and
+# onto the open doorway, which walks through to the washroom.
+D:44 .:20 R:3 .:20 R:3 .:20 A:3 .:30
+U:3 .:20 U:3 .:20 .:30 U:30 L:50 .:10
+A:3 .:400
+
+# Through the washroom's text. Then LEAVE, and the gun in the goods list, on the right.
+4x A:3 .:240
+D:52 .:40 D:3 .:40 D:3 .:40 D:3 .:40 D:3 .:40 R:3 .:40 A:3 .:40
+U:3 .:40 U:3 .:40 U:3 .:40 U:3 .:40 .:30 R:120 .:20 U:60 .:20
+A:3 .:240 A:3 .:120

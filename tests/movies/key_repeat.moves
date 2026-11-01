@@ -1,0 +1,12 @@
+# How fast the cursor steps on the commands with a direction held: at once, and then every 14 frames. The holds are cut
+# so that the end tells: 29 frames down is 3 steps, but 2 at a step every 15 frames. 27 up is 2 steps, but 3 at
+# a step every 13. So the cursor ends one row below the first command only at 14.
+
+# The logos, the title, a new game, and the opening text.
+.:900 T:4 .:300
+A:4 .:300
+40x A:3 .:60
+.:120
+
+D:29 .:60
+U:27 .:60

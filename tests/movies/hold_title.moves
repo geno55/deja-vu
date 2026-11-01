@@ -1,0 +1,6 @@
+# Holding each button the title waits for: it goes on only when it's let go.
+
+# The logos, then A held on the title for longer than the fade.
+.:900 A:240 .:300
+# Back to the title's list: B does nothing there. A held on a file, into what it opens.
+B:60 .:60 A:200 .:300

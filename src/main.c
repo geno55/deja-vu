@@ -3,7 +3,7 @@
 //
 // usage: dejavu [ROM] [--scale N] [--save FILE] [--frames N] [--screenshot FILE.bmp] [--audio-wav FILE]
 //               [--no-window] [--movie FILE.inp] [--extract-assets]
-//               [--config FILE]
+//               [--config FILE] [--state-out FILE]
 //
 // ROM        your Deja Vu (USA) dump. You only need it once: the game keeps what it needs from it in
 //            dejavu_assets.dat next to the program. Without one the game looks for that file there and
@@ -18,6 +18,8 @@
 // --audio-wav  write the sound to this WAV file as well (tools/compare_audio.py compares it)
 // --no-window  run with no window and at full speed, for testing
 // --movie    play these buttons, not yours: an .inp file, one line per frame, UDLRTSBA
+// --state-out  when stopping, write the NES's memories to this file, for testing: RAM, save RAM, nametables,
+//            palette and OAM, as dv_harness --state-out does for the reference
 // --extract-assets  make dejavu_assets.dat from the dump, and stop
 // --config   the settings file (default: dejavu.user.ini next to the program, or else dejavu.ini there;
 //            with neither, the defaults). It says which of the original's bugs to fix (src/config.h)
@@ -251,7 +253,7 @@ static void usage(FILE *f) {
 
 int main(int argc, char **argv) {
   const char *rom_path = NULL, *save_path = NULL, *screenshot = NULL;
-  const char *wav_path = NULL, *movie_path = NULL, *config_path = NULL;
+  const char *wav_path = NULL, *movie_path = NULL, *config_path = NULL, *state_path = NULL;
   long frames = -1;
   int scale = kDefaultScale, window = 1, extract_only = 0;
   for(int i = 1; i < argc; i++) {
@@ -283,6 +285,8 @@ int main(int argc, char **argv) {
       wav_path = argv[++i];
     } else if(!strcmp(arg, "--movie")) {
       movie_path = argv[++i];
+    } else if(!strcmp(arg, "--state-out")) {
+      state_path = argv[++i];
     } else {
       usage(stderr);
       return 2;
@@ -392,6 +396,20 @@ int main(int argc, char **argv) {
     }
   }
   update_save(save_path);
+  if(state_path && !status) {
+    FILE *f = fopen(state_path, "wb");
+    if(f) {
+      fwrite(g_nes.ram, 1, sizeof(g_nes.ram), f);
+      fwrite(g_nes.sram, 1, sizeof(g_nes.sram), f);
+      fwrite(g_nes.ciram, 1, sizeof(g_nes.ciram), f);
+      fwrite(g_nes.palette, 1, sizeof(g_nes.palette), f);
+      fwrite(g_nes.oam, 1, sizeof(g_nes.oam), f);
+      fclose(f);
+    } else {
+      fprintf(stderr, "dejavu: can't write %s\n", state_path);
+      status = 1;
+    }
+  }
   if(wav) {
     write_wav_header(wav, wav_samples);
     fclose(wav);

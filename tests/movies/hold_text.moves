@@ -1,0 +1,20 @@
+# The opening text, with each way of holding and tapping A and B.
+
+# The logos, the title, and a new game in file 1.
+.:900 T:4 .:300
+A:4 .:300
+
+# A held across a page and past where the next one starts: the page waits for it to be let go.
+A:300 .:90
+# B held: it doesn't turn the page or hurry the text.
+B:300 .:90
+# A tapped while the text prints finishes the page at once; then a tap turns it.
+.:10 A:3 .:30 A:3 .:60
+# B tapped through a pause, a few times.
+6x B:3 .:15
+.:60
+# A and B together, held.
+BA:200 .:90
+# The rest of the opening, by taps, until it has done.
+40x A:3 .:60
+.:120

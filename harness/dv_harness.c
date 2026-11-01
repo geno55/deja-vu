@@ -42,6 +42,8 @@
 //            addresses in bank 3, from tools/run_checks.py) on the state it has reached, the original and the port
 //            from the same state (emu_sweep_scripts).
 // --sweep-passes N  how many times over; all but the first with random flags. The default is 4.
+// --state-out FILE  when it stops, write the reference's memories to this file: RAM, save RAM, nametables, palette
+//            and OAM, as dejavu --state-out does for the game on its own.
 // --coverage FILE  write a record of what original code ran under comparison (emu_set_coverage), a byte
 //            for each byte of PRG, for tools/coverage.py.
 // --free-run  with --compare: the C side runs on its own (emu_run_frame), not told where NMIs go, and
@@ -794,7 +796,7 @@ static void usage(void) {
                   "                  [--check-ports] [--fuzz-ports N] [--fuzz-only NAME[,NAME...]]\n"
                   "                  [--fuzz-trace NAME:SAMPLE] [--picture] [--picture-dump DIR]\n"
                   "                  [--apu] [--audio-wav PREFIX] [--check-palette] [--coverage FILE]\n"
-                  "                  [--sweep-scripts FILE] [--sweep-passes N]\n"
+                  "                  [--sweep-scripts FILE] [--sweep-passes N] [--state-out FILE]\n"
                   "                  [--sav FILE] [--sav-out FILE] [--rom ROM] [--home DIR]\n");
   exit(2);
 }
@@ -803,7 +805,7 @@ int main(int argc, char **argv) {
   const char *rom = DV_DEFAULT_ROM, *home = DV_DEFAULT_HOME;
   const char *movie_path = NULL, *log_path = NULL, *emulate = "", *fuzz_only = NULL, *coverage_path = NULL;
   long frames = -1, rewind = 0, fuzz = 0, sweep_passes = 4;
-  const char *sweep_path = NULL;
+  const char *sweep_path = NULL, *state_out = NULL;
   int compare = 0, keep_going = 0, pass_through = 0, check_ports = 0, picture = 0, free_run = 0;
   int apu_check = 0;
   const char *audio_prefix = NULL, *sav_path = NULL, *sav_out = NULL;
@@ -856,6 +858,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(arg, "--fuzz-ports")) fuzz = atol(val);
     else if(!strcmp(arg, "--fuzz-only")) fuzz_only = val;
     else if(!strcmp(arg, "--sweep-scripts")) sweep_path = val;
+    else if(!strcmp(arg, "--state-out")) state_out = val;
     else if(!strcmp(arg, "--sweep-passes")) sweep_passes = atol(val);
     else if(!strcmp(arg, "--coverage")) coverage_path = val;
     else if(!strcmp(arg, "--picture-dump")) picture_dir = val;
@@ -1188,6 +1191,20 @@ int main(int argc, char **argv) {
     status |= picture_same != picture_compared;
     if(picture_diffs) {
       fclose(picture_diffs);
+    }
+  }
+  if(state_out) {
+    FILE *f = fopen(state_out, "wb");
+    for(int i = 0; f && i < kRefMemCount; i++) {
+      size_t size;
+      const uint8_t *mem = ref_mem(r, i, &size);
+      fwrite(mem, 1, size, f);
+    }
+    if(f) {
+      fclose(f);
+    } else {
+      fprintf(stderr, "dv_harness: can't write %s\n", state_out);
+      status = 1;
     }
   }
   if(sweep_path && compare) {

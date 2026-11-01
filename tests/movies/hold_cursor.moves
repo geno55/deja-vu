@@ -1,0 +1,17 @@
+# A and B held in the picture, in the inventory and across a change of screen: only the moment of the press counts.
+
+# The logos, the title, a new game, and the opening text.
+.:900 T:4 .:300
+A:4 .:300
+40x A:3 .:60
+.:120
+
+# Up twice leaves the commands for the picture, where the cursor moves a pixel a frame. With B held, and then with A.
+U:3 .:20 U:3 .:20 .:30 BU:30 BR:12 .:30 AL:10 .:120
+# Press A through what that click opened.
+6x A:3 .:90
+# Right, with B held, across the picture and on into the inventory on its right, then down.
+BR:200 .:30 BD:40 .:60
+# Back out to the left, and A on what's under it, held from the click into the message it opens.
+L:120 .:30 A:200 .:240
+6x A:3 .:90

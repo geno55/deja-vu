@@ -103,6 +103,9 @@ if(EXISTS "${DV_ROM}")
   # Saving and loading in real play, which the TAS movies never do.
   add_test(NAME save_movies COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/run_save_movies.py
            --dejavu $<TARGET_FILE:dejavu> --rom "${DV_ROM}" --work ${CMAKE_BINARY_DIR}/save_movies)
+  # The program itself on scripted movies, which also fixes how fast key repeat is.
+  add_test(NAME play_movies COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/run_play_movies.py
+           --dejavu $<TARGET_FILE:dejavu> --rom "${DV_ROM}" --work ${CMAKE_BINARY_DIR}/play_movies)
   add_test(NAME sound_driver COMMAND test_sound "${DV_ROM}")
   add_test(NAME text_fixes COMMAND test_text_fixes "${DV_ROM}")
   add_test(NAME game_alone COMMAND test_game "${DV_ROM}")

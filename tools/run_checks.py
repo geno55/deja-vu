@@ -14,6 +14,7 @@ The checks, in build/harness's dv_harness, with a Mesen2 home of its own for eac
 - --fuzz-ports 5000 on every ported routine.
 - --sweep-scripts from every opcode of every script (tools/scripts.py), from five points in the movies.
 - --check-palette, and tests/run_save_movies.py with --harness and, where MESEN is set, --mesen.
+- tests/run_play_movies.py with --harness: dejavu itself against Mesen2 on scripted movies.
 
 Every job's output goes to WORK/NAME.txt (default: build/checks). A job fails if it exits with anything but
 0, or says that any call or sample differed, and then this exits with 1. The one exception: TAS #7044's
@@ -144,6 +145,8 @@ def make_jobs(args, work):
     if os.environ.get("MESEN"):
         saves.append("--mesen")
     jobs.append(("saves", saves))
+    jobs.append(("plays", [sys.executable, str(REPO / "tests/run_play_movies.py"), "--dejavu", str(DEJAVU), "--harness",
+                           str(HARNESS), "--work", str(work / "plays")]))
     if args.only:
         words = args.only.split(",")
         jobs = [j for j in jobs if any(w in j[0] for w in words)]
