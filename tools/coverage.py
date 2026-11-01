@@ -3,13 +3,18 @@
 
 usage: coverage.py [--jobs N] [--no-run] [--no-build] [--work DIR] [--out FILE]
 
-"Compared" means one of two things, and the report keeps them apart:
+"Compared" means one of three things, and the report keeps them apart:
 - movie: --pass-through on TAS #1260 and #7044. The original's code ran against Mesen2 with every NMI
   compared. The ported run of the same movies also matches Mesen2 at every NMI, so the port took the same path,
-  as far as its state shows. Scripts are counted from these only: the fuzz's made-up scripts mean nothing.
+  as far as its state shows.
 - fuzz: --fuzz-ports 5000 on every ported routine. The code ran on made-up states, in samples where the port
   ran from the same state and the results were compared. Such a state may be one the game can't reach, so
-  a path only the fuzz takes is checked, but perhaps never played.
+  a path only the fuzz takes is checked, but perhaps never played. Its made-up scripts mean nothing, so it doesn't
+  count for scripts.
+- sweep: --sweep-scripts, from five points in the movies. Script code ran from every opcode of every script on the
+  state there, with its flags as they were and then at random, all as original code but for the waits and the NMI, and
+  the port ran from the same state. Real scripts and real state, but flags in combinations play may never reach, and
+  starting partway through a script skips what came before.
 
 It counts, from a ca65 listing of asm/*.s (what it has as instructions: a part of the ROM the disassembly has as
 data doesn't count, and neither does anything in C):
@@ -152,28 +157,35 @@ def summary(name, c):
             f"({percent(c['both'], c['branches'])} both ways)")
 
 
-def report(instructions, ops, movie, fuzz):
+def script_line(name, s):
+    return (f"{name:<14} script opcodes {s['run']} of {s['all']} ({percent(s['run'], s['all'])}); goto_ifs {s['both']} "
+            f"both ways, {s['one']} one way, {s['gotos'] - s['both'] - s['one']} never, of {s['gotos']}; "
+            f"{len(s['numbers'])} of {len(s['all_numbers'])} opcode numbers the scripts use")
+
+
+def report(instructions, ops, movie, fuzz, sweep):
     """Returns (the summary's lines, the details' lines)."""
-    both_sources = bytes(a | b for a, b in zip(movie, fuzz))
+    both_sources = bytes(a | b | c for a, b, c in zip(movie, fuzz, sweep))
     lines = [summary("movies", code_counts(instructions, movie)),
              summary("fuzz", code_counts(instructions, fuzz)),
-             summary("either", code_counts(instructions, both_sources))]
+             summary("sweep", code_counts(instructions, sweep)),
+             summary("any", code_counts(instructions, both_sources))]
     routines = defaultdict(list)
     for i in instructions:
         routines[(i.bank, i.routine)].append(i)
-    for name, flags in (("movies", movie), ("fuzz", fuzz), ("either", both_sources)):
+    for name, flags in (("movies", movie), ("fuzz", fuzz), ("sweep", sweep), ("any", both_sources)):
         reached = sum(any(flags[i.offset] & RAN for i in r) for r in routines.values())
         lines.append(f"{name:<14} routines with something run: {reached} of {len(routines)}")
     for bank in range(NUM_BANKS):
         in_bank = [i for i in instructions if i.bank == bank]
         if in_bank:
-            lines.append(summary(f"either, bank {bank}", code_counts(in_bank, both_sources)))
-    s = script_counts(ops, movie)
-    lines.append(f"scripts        opcodes {s['run']} of {s['all']} ({percent(s['run'], s['all'])}); goto_ifs {s['both']} "
-                 f"both ways, {s['one']} one way, {s['gotos'] - s['both'] - s['one']} never, of {s['gotos']}; "
-                 f"{len(s['numbers'])} of {len(s['all_numbers'])} opcode numbers the scripts use")
+            lines.append(summary(f"any, bank {bank}", code_counts(in_bank, both_sources)))
+    lines.append(script_line("movies", script_counts(ops, movie)))
+    lines.append(script_line("sweep", script_counts(ops, sweep)))
+    s = script_counts(ops, bytes(a | b for a, b in zip(movie, sweep)))
+    lines.append(script_line("both", s))
 
-    details = ["Routines not fully covered, with the movies and the fuzz together. Each line: bank:addr of the routine, "
+    details = ["Routines not fully covered, by anything. Each line: bank:addr of the routine, "
                "name, instructions run/all, then the branches that weren't seen both ways.", ""]
     for (bank, name), body in sorted(routines.items(), key=lambda kv: kv[1][0].offset):
         c = code_counts(body, both_sources)
@@ -189,7 +201,7 @@ def report(instructions, ops, movie, fuzz):
         details.append(f"{bank}:{body[0].addr:04X} {name} {c['run']}/{c['all']}" + ("" if not unseen else ": " + ", ".join(unseen)))
     details += ["", "Script opcode numbers the scripts use that never ran: " +
                 " ".join(f"{n:02X}" for n in sorted(s["all_numbers"] - set(s["numbers"]))),
-                "", "Script opcodes that never ran in the movies (bank 3):"]
+                "", "Script opcodes that never ran in the movies or the sweep (bank 3):"]
     for o in s["unrun"]:
         addr, op, _ = ops[o]
         details.append(f"  {addr:04X} {scripts.NAMES.get(op, f'op_{op:02X}')}")
@@ -208,6 +220,8 @@ def harness_jobs(args, work):
         jobs.append(run_checks.harness_job(
             work, f"fuzz{i}", "--movie", str(REPO / "build/movies/tas1260.inp"), "--compare", "--frames", "0", "--fuzz-ports",
             str(run_checks.FUZZ_SAMPLES), "--fuzz-only", ",".join(group), "--coverage", str(work / f"fuzz_{i}.cov")))
+    for movie, offset, frames in run_checks.SWEEPS:
+        jobs.append(run_checks.sweep_job(work, movie, offset, frames, "--coverage", str(work / f"sweep_{movie}_{frames}.cov")))
     return jobs
 
 
@@ -232,13 +246,14 @@ def main():
         failed = [r[0] for r in results if r[2]]
     movie_files = sorted(args.work.glob("movie_*.cov"))
     fuzz_files = sorted(args.work.glob("fuzz_*.cov"))
-    if not movie_files or not fuzz_files:
+    sweep_files = sorted(args.work.glob("sweep_*.cov"))
+    if not movie_files or not fuzz_files or not sweep_files:
         sys.exit(f"coverage: no coverage files in {args.work}: run it without --no-run")
     prg = check_rom.DEFAULT_ROM.read_bytes()[16:16 + NUM_BANKS * BANK_SIZE]
     walked = scripts.load(prg)
     ops = {rom_offset(a, scripts.BANK): (a, op, n) for a, (op, n) in walked.ops.items()}
     instructions = read_listings(args.work)
-    lines, details = report(instructions, ops, merge(movie_files), merge(fuzz_files))
+    lines, details = report(instructions, ops, merge(movie_files), merge(fuzz_files), merge(sweep_files))
     print("\n".join("coverage: " + line for line in lines))
     out = args.out or args.work / "report.txt"
     out.write_text("\n".join(lines + [""] + details) + "\n")

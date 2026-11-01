@@ -276,6 +276,15 @@ typedef struct EmuFuzzCounts {
 void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
                    EmuFuzzCounts *counts);
 
+// Runs script_loop from each of `count` places in bank 3, every opcode of every script if the caller says so (a
+// script stops at a yield, so its starts wouldn't reach the rest), on the state the C side is in now: hooks[index]
+// must be script_loop. The first pass has the flags as they are, and each pass after has them random, so that
+// conditions go both ways. Each run compares the original with the port as emu_fuzz_port does through waits, with this
+// difference: all of the original runs as original code, but for waiting and the NMI. So what it compares is
+// the 6502's whole path through real script code with the C's. Differences go to stderr, naming the place.
+void emu_sweep_scripts(size_t index, const uint16_t *places, unsigned count, unsigned passes, uint32_t seed,
+                       EmuFuzzCounts *counts);
+
 // Prints every instruction of one sample of emu_fuzz_port, under the original and the port, to
 // stderr (in each pass that has that sample). The name must stay alive.
 void emu_set_fuzz_trace(const char *name, unsigned sample);

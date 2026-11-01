@@ -28,6 +28,10 @@ enum {
                           // return), and on runs that call ported routines more often (C takes
                           // no cycles)
   kCheckLimitWaits = 1000000,  // the same for a check that runs NMIs through its waits
+  kCheckLimitSweep = 30000000,  // for emu_sweep_scripts: a script may play out a whole scene
+  kSweepReports = 40,     // differences that emu_sweep_scripts prints
+  kFlagsStart = 0x420,    // the five flag arrays, item_status and object_state: what a script's conditions test
+  kFlagsEnd = 0x4B0,
   kFuzzGiveUp = 20,       // samples through waits with none finished before a routine is left
   kCheckReports = 3,      // differences printed per routine
   kMaxPortedDepth = 500,  // the C stack would run out long before the 6502's wraps
@@ -704,6 +708,10 @@ static void return_from(uint16_t how) {
 }
 
 static uint32_t fuzz_rng;
+static int sweeping;        // emu_sweep_scripts
+static const uint16_t *sweep_places;
+static unsigned sweep_count;
+static int whole_original;  // the original being checked runs without ported routines, but for those keep_hook names
 
 static uint8_t fuzz_byte(void) {
   fuzz_rng ^= fuzz_rng << 13;  // xorshift32
@@ -907,19 +915,25 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
   int depth = ported_depth, ran = c_ran;
   uint8_t osp = outer_sp;
   check_nmis = waits;
-  const unsigned long limit = waits ? kCheckLimitWaits : kCheckLimit;
+  const unsigned long limit = sweeping ? kCheckLimitSweep : waits ? kCheckLimitWaits : kCheckLimit;
   fuzz_rng = seed * 2654435761u | 1;
   for(unsigned i = 0; i < samples; i++) {
     // A routine that never gets anywhere on made-up data (main, RLE data) costs the most.
-    if(waits && i == kFuzzGiveUp && !counts->compared) {
+    if(waits && !sweeping && i == kFuzzGiveUp && !counts->compared) {
       counts->skipped += samples - i;
       break;
     }
     g_nes = base;
     coverage_log_len = 0;
     coverage_op = kNoScriptOp;
-    for(int a = 0; a < 0x800; a++) {
-      g_nes.ram[a] = fuzz_byte();
+    if(!sweeping) {
+      for(int a = 0; a < 0x800; a++) {
+        g_nes.ram[a] = fuzz_byte();
+      }
+    } else if(i >= sweep_count) {
+      for(int a = kFlagsStart; a < kFlagsEnd; a++) {
+        g_nes.ram[a] = fuzz_byte();
+      }
     }
     // The game never sets PRG mode 1 (bit 6), which swaps out the code at $C000-$DFFF under the
     // original while the port carries on.
@@ -945,7 +959,17 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
     c->x = fuzz_byte();
     c->y = fuzz_byte();
     c->p = fuzz_byte() & ~(kFlagB | kFlagU);
-    fuzz_help_routine(h);
+    if(sweeping) {  // bank 3 mapped, as script_start leaves it, with its bank on the bank stack
+      uint16_t sweep_place = sweep_places[i % sweep_count];
+      g_nes.bank_regs[6] = 3 << 1;
+      g_nes.bank_regs[7] = (3 << 1) + 1;
+      current_bank = 3;
+      stack_index = 0xE8;
+      script_ptr[0] = (uint8_t)sweep_place;
+      script_ptr[1] = (uint8_t)(sweep_place >> 8);
+    } else {
+      fuzz_help_routine(h);
+    }
     c->s = 0xF0;
     if(ends_with_rti(h)) {  // as an NMI does, from $0000
       emu_push(0x00);
@@ -970,7 +994,9 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
     }
     switch(setjmp(check_abort)) {
       case 0: {
+        whole_original = sweeping;
         run_original(h);
+        whole_original = 0;
         if(trace) {
           print_fuzz_trace(h->name, i, waits, "the original");
         }
@@ -1011,6 +1037,7 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
     }
     in_check = 0;
     failed = 0;
+    whole_original = 0;
     ported_depth = depth;
     c_ran = ran;
     outer_sp = osp;
@@ -1029,15 +1056,36 @@ void emu_fuzz_port(size_t index, unsigned samples, uint32_t seed, int waits,
                                                       "return, the original did)")
                                    : port_diff(&original, phase == 1, what, sizeof(what));
     counts->compared++;
-    if(len && counts->differed++ < kCheckReports) {
-      fprintf(stderr, "dv: port fuzz: %s (sample %u, called with a=%02X x=%02X y=%02X) differs, "
-                      "port/original:%s\n",
-              h->name, i, start.cpu.a, start.cpu.x, start.cpu.y, what);
+    if(len && counts->differed < (unsigned long)(sweeping ? kSweepReports : kCheckReports)) {
+      if(sweeping) {
+        fprintf(stderr, "dv: script sweep: 3:%04X (sample %u) differs, port/original:%s\n", sweep_places[i % sweep_count],
+                i, what);
+      } else {
+        fprintf(stderr, "dv: port fuzz: %s (sample %u, called with a=%02X x=%02X y=%02X) differs, "
+                        "port/original:%s\n",
+                h->name, i, start.cpu.a, start.cpu.x, start.cpu.y, what);
+      }
     }
+    counts->differed += len != 0;
   }
   g_nes = base;
   check_nmis = 0;
   check_limit = kCheckLimit;
+}
+
+void emu_sweep_scripts(size_t index, const uint16_t *places, unsigned count, unsigned passes, uint32_t seed,
+                       EmuFuzzCounts *counts) {
+  sweeping = 1;
+  sweep_places = places;
+  sweep_count = count;
+  emu_fuzz_port(index, passes * count, seed, 1, counts);
+  sweeping = 0;
+}
+
+// What stays in C under whole_original: what waits, as a 6502 wait would never end in a check, and the NMI.
+static int keep_hook(const EmuHook *h) {
+  return !strcmp(h->name, "wait_vblank") || !strcmp(h->name, "wait_nmi_work_done") ||
+         !strcmp(h->name, "wait_vram_queue_empty") || !strcmp(h->name, "nmi");
 }
 
 // Runs a ported routine in place of the original at pc, then carries on as it says.
@@ -1102,7 +1150,7 @@ static void cpu_jammed(const Cpu6502 *c) {
 static uint16_t step(void) {
   Cpu6502 *c = &g_nes.cpu;
   const EmuHook *h = hook_first[c->pc] ? find_hook(c->pc) : NULL;
-  if(h && !lag_inside(h)) {
+  if(h && !lag_inside(h) && (!whole_original || keep_hook(h))) {
     return run_hook(h);
   }
   originals_run += h != NULL;

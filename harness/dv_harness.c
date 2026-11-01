@@ -38,6 +38,10 @@
 // --fuzz-only NAME[,NAME...]  with --fuzz-ports: only these routines.
 // --fuzz-trace NAME:SAMPLE  with --fuzz-ports: prints every instruction of that sample of that
 //            routine, as the report of a difference names it, under the original and the port.
+// --sweep-scripts FILE  with --compare: after the movie's --frames, run script code from each place FILE lists (hex
+//            addresses in bank 3, from tools/run_checks.py) on the state it has reached, the original and the port
+//            from the same state (emu_sweep_scripts).
+// --sweep-passes N  how many times over; all but the first with random flags. The default is 4.
 // --coverage FILE  write a record of what original code ran under comparison (emu_set_coverage), a byte
 //            for each byte of PRG, for tools/coverage.py.
 // --free-run  with --compare: the C side runs on its own (emu_run_frame), not told where NMIs go, and
@@ -790,6 +794,7 @@ static void usage(void) {
                   "                  [--check-ports] [--fuzz-ports N] [--fuzz-only NAME[,NAME...]]\n"
                   "                  [--fuzz-trace NAME:SAMPLE] [--picture] [--picture-dump DIR]\n"
                   "                  [--apu] [--audio-wav PREFIX] [--check-palette] [--coverage FILE]\n"
+                  "                  [--sweep-scripts FILE] [--sweep-passes N]\n"
                   "                  [--sav FILE] [--sav-out FILE] [--rom ROM] [--home DIR]\n");
   exit(2);
 }
@@ -797,7 +802,8 @@ static void usage(void) {
 int main(int argc, char **argv) {
   const char *rom = DV_DEFAULT_ROM, *home = DV_DEFAULT_HOME;
   const char *movie_path = NULL, *log_path = NULL, *emulate = "", *fuzz_only = NULL, *coverage_path = NULL;
-  long frames = -1, rewind = 0, fuzz = 0;
+  long frames = -1, rewind = 0, fuzz = 0, sweep_passes = 4;
+  const char *sweep_path = NULL;
   int compare = 0, keep_going = 0, pass_through = 0, check_ports = 0, picture = 0, free_run = 0;
   int apu_check = 0;
   const char *audio_prefix = NULL, *sav_path = NULL, *sav_out = NULL;
@@ -849,6 +855,8 @@ int main(int argc, char **argv) {
     else if(!strcmp(arg, "--emulate")) emulate = val;
     else if(!strcmp(arg, "--fuzz-ports")) fuzz = atol(val);
     else if(!strcmp(arg, "--fuzz-only")) fuzz_only = val;
+    else if(!strcmp(arg, "--sweep-scripts")) sweep_path = val;
+    else if(!strcmp(arg, "--sweep-passes")) sweep_passes = atol(val);
     else if(!strcmp(arg, "--coverage")) coverage_path = val;
     else if(!strcmp(arg, "--picture-dump")) picture_dir = val;
     else if(!strcmp(arg, "--sav")) sav_path = val;
@@ -1180,6 +1188,30 @@ int main(int argc, char **argv) {
     status |= picture_same != picture_compared;
     if(picture_diffs) {
       fclose(picture_diffs);
+    }
+  }
+  if(sweep_path && compare) {
+    static uint16_t sweep_list[0x4000];
+    unsigned count = 0, place;
+    FILE *f = fopen(sweep_path, "r");
+    while(f && count < 0x4000 && fscanf(f, "%x", &place) == 1) {
+      sweep_list[count++] = (uint16_t)place;
+    }
+    if(f) {
+      fclose(f);
+    }
+    for(size_t i = 0; count && i < ported_count; i++) {
+      if(!strcmp(ported[i].name, "script_loop")) {
+        EmuFuzzCounts counts;
+        emu_sweep_scripts(i, sweep_list, count, (unsigned)sweep_passes, 1, &counts);
+        printf("dv_harness: script sweep: %lu samples compared, %lu skipped, %lu differed\n", counts.compared,
+               counts.skipped, counts.differed);
+        status |= counts.differed != 0;
+      }
+    }
+    if(!count) {
+      fprintf(stderr, "dv_harness: no places in %s\n", sweep_path);
+      status = 1;
     }
   }
   if(coverage) {

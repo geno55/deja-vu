@@ -12,6 +12,7 @@ The checks, in build/harness's dv_harness, with a Mesen2 home of its own for eac
 - For TAS #1260 and #7044, --compare with --check-ports, --picture and --apu; again with --emulate and
   every routine that calls another (tools/nonleaf_routines.py); and with --pass-through.
 - --fuzz-ports 5000 on every ported routine.
+- --sweep-scripts from every opcode of every script (tools/scripts.py), from five points in the movies.
 - --check-palette, and tests/run_save_movies.py with --harness and, where MESEN is set, --mesen.
 
 Every job's output goes to WORK/NAME.txt (default: build/checks). A job fails if it exits with anything but
@@ -32,10 +33,16 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "tools"))
+import check_rom  # noqa: E402
+import scripts  # noqa: E402
+from nes6502 import BANK_SIZE, NUM_BANKS  # noqa: E402
+
 HARNESS = REPO / "build/harness/harness/Release/dv_harness"
 DEJAVU = REPO / "build/Release/dejavu"
 MOVIES = (("tas1260", 0), ("tas7044", 1))
 FUZZ_SAMPLES = 5000
+SWEEPS = (("tas1260", 0, 5000), ("tas1260", 0, 15000), ("tas1260", 0, 30000), ("tas7044", 1, 8000), ("tas7044", 1, 20000))
 FUZZ_LINE = re.compile(r"port fuzz( through waits)?: (\d+) samples compared.*?(\d+) differed")
 KNOWN_PICTURE = re.compile(r"of the (\d+) that differ, (\d+) had reads of \$2007")
 MATCHED = re.compile(r"matched the reference at (\d+) of (\d+) NMIs")
@@ -98,6 +105,20 @@ def harness_job(work, name, *args):
     return name, [str(HARNESS), *args, "--home", str(work / "home" / name)]
 
 
+def write_script_places(work):
+    """The address of every opcode of every script, for --sweep-scripts. Returns the file's path."""
+    prg = check_rom.DEFAULT_ROM.read_bytes()[16:16 + NUM_BANKS * BANK_SIZE]
+    path = work / "script_places.txt"
+    path.write_text("".join(f"{addr:04X}\n" for addr in sorted(scripts.load(prg).ops)))
+    return path
+
+
+def sweep_job(work, movie, offset, frames, *more):
+    return harness_job(work, f"sweep_{movie}_{frames}", "--movie", str(REPO / f"build/movies/{movie}.inp"), "--offset",
+                       str(offset), "--compare", "--frames", str(frames), "--sweep-scripts",
+                       str(write_script_places(work)), *more)
+
+
 def make_jobs(args, work):
     jobs = [("ctest", ["ctest", "--test-dir", "build", "-C", "Release", "--output-on-failure", "-j",
                        str(max(args.jobs // 2, 1))])]
@@ -116,6 +137,7 @@ def make_jobs(args, work):
     else:
         for i, group in enumerate(shards(ported_routines(), count)):
             jobs.append(harness_job(work, f"fuzz{i}", *fuzz, "--fuzz-only", ",".join(group)))
+    jobs += [sweep_job(work, *sweep) for sweep in SWEEPS]
     jobs.append(harness_job(work, "palette", "--check-palette"))
     saves = [sys.executable, str(REPO / "tests/run_save_movies.py"), "--dejavu", str(DEJAVU), "--harness",
              str(HARNESS), "--work", str(work / "saves")]

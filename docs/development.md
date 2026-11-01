@@ -61,23 +61,28 @@ Passing says little about code that never ran. This says what ran:
 python tools/coverage.py
 ```
 
-It runs the movies in `--pass-through` and the fuzz with `--coverage`, in about 3 minutes, and counts instructions, branch
-directions, routines and script opcodes from a listing of `asm/`. `build/coverage/report.txt` lists every routine with
-something unrun, every branch not seen both ways and every script opcode that never ran. Its docstring says what
-counts as compared. The movies are counted apart from the fuzz, as a path only the fuzz takes may be one the game
-can't reach.
+It runs the movies in `--pass-through`, the fuzz and the script sweep with `--coverage`, in about 7 minutes, and counts
+instructions, branch directions, routines and script opcodes from a listing of `asm/`. `build/coverage/report.txt` lists
+every routine with something unrun, every branch not seen both ways and every script opcode that never ran. Its
+docstring says what counts as compared. Each source is counted apart, as a path only the fuzz or the sweep takes may be
+one the game can't reach.
 
-On 2026-10-31:
+On 2026-11-01:
 
-| | Instructions (of 9,820) | Branches both ways (of 824) |
-|---|---|---|
-| Movies | 78.9% | 47.1% |
-| Fuzz | 87.3% | 72.7% |
-| Either | 93.2% | 79.1% |
+| | Instructions (of 9,820) | Branches both ways (of 824) | Script opcodes (of 4,668) | `goto_if`s both ways (of 972) | Opcode numbers (of 91) |
+|---|---|---|---|---|---|
+| Movies | 78.9% | 47.1% | 25.3% | 55 | 65 |
+| Fuzz | 87.3% | 72.7% | not counted | not counted | not counted |
+| Sweep | 53.5% | 29.1% | 96.8% | 937 | 90 |
+| Any | 94.0% | 81.2% | 96.9% (movies and sweep) | 939 | 90 |
 
-In the movies, 1,179 of 4,668 script opcodes ran (25.3%), and of 972 `goto_if`s, 55 went both ways and 690 never ran. They are
-speedruns, so most of the game's script content has never been compared, and that includes 26 of the 91 opcode
-numbers the scripts use. Those handlers are fuzzed as routines, but not with real scripts.
+The movies are speedruns, so on their own they reach a quarter of the scripts. The script sweep (`--sweep-scripts`) starts
+from every opcode of every script, on the state at five points in the movies, with the flags as they are and then at
+random. It runs the 6502 all the way, but for the waits and the NMI, and the port from the same state, and compares them: 107,788
+runs, no differences, 5,032 skipped. With `op_4A` broken on purpose it named the two script places that use it, while
+the movie's own 5,000 frames still matched. It tests the original's path against the C's in states play may never reach, and
+a script started partway has skipped what came before, so it doesn't replace playing the game. The one
+opcode number that never ran is `$0F`, in all 12 of its places: every run from them was skipped (not looked into).
 
 The record agrees with `Mesen.exe` on the same movies. The script opcodes that ran are the same in both (from
 `run_mesen.py --trace-scripts`). So are the instructions (from its code log), but for one in `ending_sequence` in #1260. That run
