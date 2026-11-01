@@ -59,6 +59,13 @@ int main(int argc, char **argv) {
     DvConfig other = {0};
     CHECK(config_read(path, &other, err, sizeof(err)) == 0);
     CHECK(other.fix_text == 1 && other.fix_bugs == 0);
+    f = fopen(path, "wb");
+    CHECK(f != NULL);
+    fputs("[Features]\nMouseAndTouch = 1\n", f);
+    fclose(f);
+    DvConfig mouse = {0};
+    CHECK(config_read(path, &mouse, err, sizeof(err)) == 0);
+    CHECK(mouse.mouse_and_touch == 1 && mouse.fix_text == 0 && mouse.fix_bugs == 0);
   }
 
   // No file: it says so, and the settings stay.

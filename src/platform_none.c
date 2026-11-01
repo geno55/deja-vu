@@ -26,6 +26,9 @@ int platform_frame(const uint32_t *rgb, uint8_t *pad, const char *screenshot) {
   return 0;
 }
 
+void platform_capture_mouse(void) {
+}
+
 void platform_close(void) {
 }
 

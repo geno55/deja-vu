@@ -4,6 +4,7 @@
 //
 // $60 is the place in the picture the cursor is at, in the form the room lists use.
 #include "funcs.h"
+#include "pointer.h"
 #include "variables.h"
 
 // LDA script_flags, AND #$04: the script condition, in A and as the result.
@@ -566,6 +567,7 @@ void far_8000_66(void) {
       data_ptr[0] = 0x00;
       read_joypads();
       read_input_with_repeat();
+      pointer_choose_address();
       emu_set_a(data_ptr[0]);
       g_ram[0x83] = c->a;
       step_address_choice();

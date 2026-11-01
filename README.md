@@ -73,6 +73,12 @@ It has been played on Windows. Linux builds are tested automatically, and macOS 
 Use the d-pad to move the cursor around the picture, the commands and your inventory, and press A to
 click.
 
+You can also turn on the mouse and touch screens, with `MouseAndTouch` under [Settings](#settings). The
+game's cursor then follows the pointer on every screen, and menus choose the row under it. The left button
+is A and the right button is B. The system's mouse cursor is hidden and kept in the window: press Esc to
+let it go, for example to move or close the window, and click in the window to take it back. On a touch
+screen, the cursor follows your finger and lifting it clicks, and touching with a second finger is B.
+
 To quit, close the window. Your save is written when the game stops.
 
 ## Saves
@@ -108,6 +114,7 @@ you update, copy it to `dejavu.user.ini` there: the game reads that one instead.
 |---|---|---|
 | `FixText` | `0` | With `1`, corrects the original's typos, grammar, punctuation and inconsistent spellings. It doesn't affect saves. |
 | `FixBugs` | `0` | With `1`, fixes the original's save check, where a damaged save file is erased or hangs the game, and the capsule warp, which breaks the room you are in when you use the capsules on medicine you haven't taken. Speedruns use that warp. |
+| `MouseAndTouch` | `0` | With `1`, you can play with the mouse or a touch screen as well as the buttons (see [Controls](#controls)). It doesn't affect saves, and `--movie` ignores it. |
 
 ## How close is it to the NES?
 The game was compared frame by frame with the original running in the Mesen2 emulator, using two recorded

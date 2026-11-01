@@ -9,7 +9,8 @@ this folder. That file is a copy of the game's data, so please don't share it.
 Keys: arrows for the d-pad, X for A, Z for B, Enter for Start, right Shift for Select. A game controller
 works too. Close the window to quit.
 
-Settings are in dejavu.ini here, which says what each one does.
+Settings are in dejavu.ini here, which says what each one does. That includes playing with the mouse or
+a touch screen, which is off until you turn it on.
 
 Your saves are in the saves folder here. saves\dejavu.sav is the same as an emulator's .sav, so you can
 copy one over and rename it, in either direction.

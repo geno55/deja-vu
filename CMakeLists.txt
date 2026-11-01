@@ -21,7 +21,7 @@ add_library(dv_core STATIC src/cpu6502.c src/nes_hw.c src/coro.c src/dv_cpu_infr
             src/scripts.c src/flags.c src/opcodes.c src/rooms.c src/special_scenes.c
             src/saves.c src/layouts.c src/room_view.c src/room_commands.c src/inventory.c
             src/slot_machine.c src/menus.c src/sound.c src/game.c src/ppu_render.c src/apu.c
-            src/assets.c src/save_file.c src/config.c src/text_fixes.c)
+            src/assets.c src/save_file.c src/config.c src/text_fixes.c src/pointer.c)
 target_include_directories(dv_core PUBLIC src)
 if(NOT WIN32)
   target_link_libraries(dv_core PUBLIC m)
@@ -54,6 +54,8 @@ add_executable(test_sound tests/test_sound.c)
 target_link_libraries(test_sound PRIVATE dv_core)
 add_executable(test_game tests/test_game.c)
 target_link_libraries(test_game PRIVATE dv_core)
+add_executable(test_pointer tests/test_pointer.c)
+target_link_libraries(test_pointer PRIVATE dv_core)
 add_executable(test_apu tests/test_apu.c)
 target_link_libraries(test_apu PRIVATE dv_core)
 add_executable(test_palette tests/test_palette.c)
@@ -66,7 +68,7 @@ add_executable(test_config tests/test_config.c)
 target_link_libraries(test_config PRIVATE dv_core)
 add_executable(test_assets tests/test_assets.c)
 target_link_libraries(test_assets PRIVATE dv_core)
-foreach(target dv_core dejavu test_cpu6502 test_bridge test_sound test_game test_apu test_palette
+foreach(target dv_core dejavu test_cpu6502 test_bridge test_sound test_game test_pointer test_apu test_palette
         test_save_file test_config test_text_fixes test_assets)
   if(MSVC)
     target_compile_options(${target} PRIVATE /W4)
@@ -108,6 +110,8 @@ if(EXISTS "${DV_ROM}")
            --dejavu $<TARGET_FILE:dejavu> --rom "${DV_ROM}" --work ${CMAKE_BINARY_DIR}/play_movies)
   add_test(NAME sound_driver COMMAND test_sound "${DV_ROM}")
   add_test(NAME text_fixes COMMAND test_text_fixes "${DV_ROM}")
+  add_test(NAME pointer COMMAND test_pointer "${DV_ROM}")
+  set_tests_properties(pointer PROPERTIES TIMEOUT 120)
   add_test(NAME game_alone COMMAND test_game "${DV_ROM}")
   set_tests_properties(game_alone PROPERTIES TIMEOUT 300)  # a loop that never waits shows as this
   # Every data block -> editable text/PNG -> bytes again, checked against the ROM.

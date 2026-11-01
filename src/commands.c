@@ -16,6 +16,7 @@
 // reference's NMIs can land anywhere in that loop: every routine it runs checks its guard on
 // every pass, and jump_table, which C calls without one, gets JUMP_TABLE_OR_ORIGINAL.
 #include "funcs.h"
+#include "pointer.h"
 #include "variables.h"
 
 // ---- Reading the controller ----------------------------------------------------------------
@@ -39,11 +40,15 @@ void get_input(void) {
   Cpu6502 *c = &g_nes.cpu;
   do {
     RUN_ORIGINAL_IF_LAG(kGetInput);  // the loop starts at the routine's start
+    int pointer_moved = g_pointer_on && pointer_to_cursor();
     read_input();
     emu_set_a(data_ptr[0]);
     // The original's key_repeat counts 9.7 a frame on average while a direction is held (measured on
     // Mesen2), which gives a step every 14 frames there and here.
     if(!c->a) {
+      if(pointer_moved) {
+        return;  // as after a step of the d-pad: the caller draws the cursor there
+      }
       emu_spin(97);
     }
   } while(!c->a);

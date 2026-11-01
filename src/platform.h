@@ -20,6 +20,10 @@ void platform_queue_audio(const int16_t *samples, size_t count);
 // screenshot, if not NULL, names a BMP file to write what the window shows.
 int platform_frame(const uint32_t *rgb, uint8_t *pad, const char *screenshot);
 
+// For playing with the mouse: hides the system's cursor and keeps it over the picture, as the game draws
+// its own. Esc lets it go, and a click in the window takes it back.
+void platform_capture_mouse(void);
+
 void platform_close(void);
 
 // Shows an error that stops the game where the player will see it: a message box in a release build on

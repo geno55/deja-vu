@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+#include "pointer.h"
+
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 
@@ -28,6 +30,7 @@ static Uint64 next_frame;
 static SDL_AudioDeviceID audio;
 static unsigned audio_rate;
 static int audio_started;
+static int mouse_captured;
 
 int platform_open(int scale) {
   SDL_SetMainReady();
@@ -149,6 +152,88 @@ static void write_screenshot(const char *path) {
   SDL_FreeSurface(surface);
 }
 
+// Keeps the mouse over the picture, in the window's own units: the black bars have no pointer to see.
+static void confine_mouse(void) {
+  int x1, y1, x2, y2;
+  SDL_RenderLogicalToWindow(renderer, 0, 0, &x1, &y1);
+  SDL_RenderLogicalToWindow(renderer, kPictureWidth, kPictureHeight, &x2, &y2);
+  SDL_Rect rect = {x1, y1, x2 - x1, y2 - y1};
+  SDL_SetWindowMouseRect(window, &rect);
+}
+
+static void set_mouse_captured(int captured) {
+  mouse_captured = captured;
+  SDL_ShowCursor(captured ? SDL_DISABLE : SDL_ENABLE);
+  if(captured) {
+    confine_mouse();
+  } else {
+    SDL_SetWindowMouseRect(window, NULL);
+    pointer_button(0, 0);  // whatever was down stays down in the game otherwise
+    pointer_button(1, 0);
+  }
+  SDL_SetWindowMouseGrab(window, captured ? SDL_TRUE : SDL_FALSE);
+}
+
+void platform_capture_mouse(void) {
+  set_mouse_captured(1);
+}
+
+// SDL has already put a mouse's place in the picture's pixels, and a finger's in fractions of the picture,
+// as the renderer's logical size asks. It also makes a mouse of each finger, which is left out here. A
+// mouse that has been let go is the system's, until a click takes it back.
+static void pointer_event(const SDL_Event *event) {
+  switch(event->type) {
+    case SDL_MOUSEMOTION:
+      if(mouse_captured && event->motion.which != SDL_TOUCH_MOUSEID) {
+        pointer_move(event->motion.x, event->motion.y);
+      }
+      break;
+    case SDL_MOUSEBUTTONDOWN:
+    case SDL_MOUSEBUTTONUP:
+      if(g_pointer_on && !mouse_captured && event->type == SDL_MOUSEBUTTONDOWN &&
+         event->button.which != SDL_TOUCH_MOUSEID) {
+        set_mouse_captured(1);
+      } else if(mouse_captured && event->button.which != SDL_TOUCH_MOUSEID) {
+        int down = event->type == SDL_MOUSEBUTTONDOWN;
+        if(event->button.button == SDL_BUTTON_LEFT) {
+          if(down) {
+            pointer_move(event->button.x, event->button.y);
+          }
+          pointer_button(0, down);
+        } else if(event->button.button == SDL_BUTTON_RIGHT) {
+          pointer_button(1, down);
+        }
+      }
+      break;
+    case SDL_FINGERDOWN:
+    case SDL_FINGERMOTION:
+    case SDL_FINGERUP: {
+      long long id = (long long)event->tfinger.fingerId;
+      int x = (int)(event->tfinger.x * kPictureWidth), y = (int)(event->tfinger.y * kPictureHeight);
+      if(event->type == SDL_FINGERDOWN) {
+        pointer_finger_down(id, x, y);
+      } else if(event->type == SDL_FINGERMOTION) {
+        pointer_finger_move(id, x, y);
+      } else {
+        pointer_finger_up(id, x, y);
+      }
+      break;
+    }
+    case SDL_KEYDOWN:
+      if(mouse_captured && event->key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+        set_mouse_captured(0);
+      }
+      break;
+    case SDL_WINDOWEVENT:
+      if(mouse_captured && event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+        confine_mouse();
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 int platform_frame(const uint32_t *rgb, uint8_t *pad, const char *screenshot) {
   int running = 1;
   SDL_Event event;
@@ -161,6 +246,8 @@ int platform_frame(const uint32_t *rgb, uint8_t *pad, const char *screenshot) {
               event.cdevice.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller))) {
       SDL_GameControllerClose(controller);
       controller = NULL;
+    } else {
+      pointer_event(&event);
     }
   }
   *pad = read_buttons();

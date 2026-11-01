@@ -5,6 +5,7 @@
 // These wait for the NMI most of the way, and the title spins on the controller without a wait, so
 // they check whether to go on as original code on every pass (RESUME_ORIGINAL_IF_LAG).
 #include "funcs.h"
+#include "pointer.h"
 #include "variables.h"
 
 // The two run-length-coded screens: their data follows the JSR.
@@ -61,6 +62,7 @@ void file_select_menu(void) {
     wait_vblank_and_hide_sprites();
     RESUME_ORIGINAL_IF_LAG(kFileSelectMenu, 0x86D9, 0);
     read_joypads();
+    pointer_choose_row(&save_file, 3, 0x80, kFileCursorYs, 1);
     emu_set_a(joy_pressed[0]);
     if(!(c->a & 0x80)) {
       emu_set_a(c->a & 0x0C);
@@ -100,6 +102,7 @@ void file_select_menu(void) {
       wait_vblank_and_hide_sprites();
       RESUME_ORIGINAL_IF_LAG(kFileSelectMenu, 0x8718, 0);
       read_joypads();
+      pointer_choose_row(&g_ram[0x84], 3, 0x70, kOptionCursorYs, 1);
       emu_set_a(joy_pressed[0]);
       if(c->a & 0x80) {
         break;
@@ -506,6 +509,8 @@ void confirm_dialog_loop(void) {
     wait_vblank_and_hide_sprites();
     RESUME_ORIGINAL_IF_LAG(kConfirmDialogLoop, 0x8A69, 0);
     read_joypads();
+    uint16_t answers = (uint16_t)(kDialogCursors + g_ram[0x84] * 4);
+    pointer_choose_row(&scene_index, 2, cpu_bus_read(answers), (uint16_t)(answers + 1), 2);
     emu_set_a(joy_pressed[0]);
     if(c->a & 0x80) {
       TAIL_ORIGINAL_IF_LAG(kResetDialogAnswer, 0x8A3C, 0);

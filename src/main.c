@@ -33,6 +33,7 @@
 #include "funcs.h"
 #include "nes_hw.h"
 #include "platform.h"
+#include "pointer.h"
 #include "ppu_render.h"
 #include "save_file.h"
 #include "text_fixes.h"
@@ -54,6 +55,7 @@ static uint32_t picture_rgb[kScreenWidth * kScreenHeight];
 static int16_t audio[4096];
 static GameData game_data;
 static int fix_text;     // the settings' FixText
+static int mouse_and_touch;  // the settings' MouseAndTouch
 static int show_errors;  // playing in a window: an error that stops the game has to be seen
 
 static void draw_picture(void) {
@@ -154,6 +156,7 @@ static int load_settings(const char *path, const char *dir) {
   }
   g_fix_bugs = config.fix_bugs;
   fix_text = config.fix_text;
+  mouse_and_touch = config.mouse_and_touch;
   return 0;
 }
 
@@ -316,6 +319,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "dejavu: can't read %s\n", movie_path);
     return 1;
   }
+  g_pointer_on = mouse_and_touch && !movie;  // a movie plays the same wherever the mouse goes
 
   if(fix_text) {  // after the pack is written: it stays the player's own data
     char fix_err[256];
@@ -345,6 +349,10 @@ int main(int argc, char **argv) {
   if(window) {
     usage(stdout);
     platform_open_audio(kAudioRate);
+    if(g_pointer_on) {
+      printf("mouse: left = A, right = B; Esc lets the mouse go, and a click takes it back\n");
+      platform_capture_mouse();
+    }
   }
   apu_reset(kAudioRate, audio, sizeof(audio) / sizeof(audio[0]));
   FILE *wav = wav_path ? fopen(wav_path, "wb") : NULL;
@@ -356,7 +364,7 @@ int main(int argc, char **argv) {
   int status = 0;
   uint8_t pad = 0;
   for(long frame = 0; frames < 0 || frame < frames; frame++) {
-    g_nes.pad[0] = movie ? (frame < movie_frames ? movie[frame] : 0) : pad;
+    g_nes.pad[0] = movie ? (frame < movie_frames ? movie[frame] : 0) : pad | pointer_pad();
     if(emu_run_frame(err, sizeof(err))) {
       char message[1300];
       snprintf(message, sizeof(message), "frame %ld: %s", frame, err);
@@ -383,6 +391,7 @@ int main(int argc, char **argv) {
       update_save(save_path);
     }
     int last = frame + 1 == frames;
+    pointer_draw(picture);
     if(window || (last && screenshot)) {
       for(int i = 0; i < kScreenWidth * kScreenHeight; i++) {
         picture_rgb[i] = palette_rgb[picture[i] & (kPpuColors - 1)];
